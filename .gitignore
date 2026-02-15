@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+# artifacts/  ← Comment it out or delete this line
+
+
+# Node
+node_modules/
+dist/
+.build/
+
+
+# Env
+.env
+.env.*.local
+
+
+# OS
+.DS_Store
+Thumbs.db
