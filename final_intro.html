@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../src/index.css" />
+    <link rel="stylesheet" href="https://use.typekit.net/jha8zkp.css">
+    <title>Document</title>
+</head>
+<body>
+   <p class="introtext" id="output"></p>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const username = params.get("name") || "stranger";
+  document.getElementById("output").textContent = username + "...Nice to meet you... Let’s start getting you familiar with the platform, so I can get to know you better...";
+</script>
+
+<div>
+  <button onclick="window.location.href='index.html'" class="arrow">
+    <img src="assets/img/Arrow.svg" alt="ENTER">
+  </button>
+</div>
+</body>
+</html>     
