@@ -1,1 +1,150 @@
-:root{--lightningcss-light:initial;--lightningcss-dark: ;color-scheme:light dark;color:#ffffffde;font-synthesis:none;text-rendering:optimizelegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;background-color:#242424;font-family:system-ui,Avenir,Helvetica,Arial,sans-serif;font-weight:400;line-height:1.5}@media (prefers-color-scheme:dark){:root{--lightningcss-light: ;--lightningcss-dark:initial}}a{color:#646cff;-webkit-text-decoration:inherit;text-decoration:inherit;font-weight:500}a:hover{color:#535bf2}.body{background-color:#000;background-image:url(/Alg/assets/Rectangle3802-BKI9_fO_.png);background-size:cover;place-items:center;min-width:320px;min-height:100vh;margin:0;display:flex}body{background-color:#000;background-image:url(/Alg/assets/Rectangle3803-DqjKT-N1.png),url(/Alg/assets/AlgoracleVisual-DfEepaHr.gif);background-position:50%,50% 1%;background-repeat:no-repeat,no-repeat;background-size:cover,140%;place-items:center;min-width:320px;min-height:100vh;margin:0;display:flex}h1{color:#fff;text-align:center;text-shadow:0 27px 42.8px #00000080;width:655px;margin-top:500px;margin-left:44px;font-family:Cesso;font-size:135px;font-style:normal;font-weight:400;line-height:normal}button{cursor:pointer;background-color:#000;border:10px;border-radius:500px;padding:.6em 1em .1em;font-family:inherit;font-size:1em;font-weight:500;transition:border-color .25s}button:hover{border-color:#646cff}button:focus,button:focus-visible{outline:4px auto -webkit-focus-ring-color}@media (prefers-color-scheme:light){:root{color:#213547;background-color:#fff}a:hover{color:#747bff}button{background-color:#f9f9f9}}.enter{text-align:center;color:#fff;background-color:#0000;border:6px solid #fff;border-radius:19px;justify-content:center;align-items:center;width:435px;height:59px;margin-top:800px;margin-left:-500px;font-family:fredoka-variable,sans-serif;font-size:34px;font-style:normal;font-weight:400;line-height:normal;transition:opacity .5s;display:flex}.introtext{color:#fff;text-align:center;margin-top:800px;font-family:mr-eaves-xl-modern,sans-serif;font-size:26pt}.Algoracle{color:#fff;font-family:Cesso,sans-serif;font-size:24pt}.intro{width:700px}.arrow{text-align:center;color:#fff;background-color:#0000;border:4px solid #fff;border-radius:19px;justify-content:center;align-items:center;width:60px;height:45px;transition:opacity .5s;display:flex}
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+a:hover {
+  color: #535bf2;
+}
+
+.body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #000000;
+  background-image: url('assets/img/Rectangle3802.png');
+  background-size: cover;
+}
+
+body{
+    margin: 0;
+    display: flex;
+    place-items: center;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: #000000;
+    background-image: url('assets/img/Rectangle3803.png'), url('assets/img/AlgoracleVisual.gif') ;
+    background-size: cover, 140%;
+    background-repeat: no-repeat, no-repeat;
+    background-position: 50% 50%, 50% 1%; 
+
+}
+
+
+h1 {
+  width: 655px;
+  color: #FFF;
+  text-align: center;
+  text-shadow: 0 27px 42.8px rgba(0, 0, 0, 0.50);
+  font-family: Cesso;
+  font-size: 135px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: normal;
+  margin-left: 44px;
+  margin-top: 500px;
+}
+
+button {
+  border-radius: 500px;
+  border: 10px;
+  padding: 0.6em 1em 0.1em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+  background-color: #000000;
+}
+button:hover {
+  border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}
+.enter{    
+    margin-top: 800px;
+    margin-left: -500px;
+    width: 435px;
+    height: 59px;
+    border-radius: 19px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background-color: #00000000;
+    transition: opacity 0.5s;
+    border: 6px solid #FFF;
+   
+    font-family: fredoka-variable, sans-serif;
+    font-size: 34px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    color: #ffffff;
+    
+}
+.introtext{
+   margin-top: 800px;
+   font-size : 26pt;
+   font-family: mr-eaves-xl-modern, sans-serif;
+   color : #FFF;
+   text-align: center;
+
+
+}
+.Algoracle{
+    font-size : 24pt;
+    font-family: Cesso, sans-serif;
+    color : #FFF;
+}   
+
+.intro{
+  width: 700px;
+}
+
+.arrow{
+    width: 60px;
+    height: 45px;
+    border-radius: 19px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background-color: #00000000;
+    transition: opacity 0.5s;
+    border: 4px solid #FFF;
+    color: #ffffff;
+}
