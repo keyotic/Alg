@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="index.css" />
+    <link rel="stylesheet" href="https://use.typekit.net/jha8zkp.css">
+    <title>Document</title>
+</head>
+<body>
+        
+<input type="text" id="username" placeholder="Name" />
+<button onclick="goNext()" class="arrow">
+  <img src="assets/img/Arrow.svg" alt="ENTER">
+</button>
+
+<script>
+  function goNext() {
+    const name = document.getElementById("username").value;
+    window.location.href = "final_intro.html?name=" + encodeURIComponent(name);
+  }
+</script>
+</body>
+</html>    
