@@ -29,7 +29,7 @@ a:hover {
   min-width: 320px;
   min-height: 100vh;
   background-color: #000000;
-  background-image: url('assets/img/Rectangle3802.png');
+  background-image: url('../public/assets/img/Rectangle3802.png');
   background-size: cover;
 }
 
@@ -40,7 +40,7 @@ body{
     min-width: 320px;
     min-height: 100vh;
     background-color: #000000;
-    background-image: url('assets/img/Rectangle3803.png'), url('assets/img/AlgoracleVisual.gif') ;
+    background-image: url('../public/assets/img/Rectangle3803.png'), url('../public/assets/img/AlgoracleVisual.gif') ;
     background-size: cover, 140%;
     background-repeat: no-repeat, no-repeat;
     background-position: 50% 50%, 50% 1%; 
