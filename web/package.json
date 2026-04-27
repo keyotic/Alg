@@ -29,5 +29,8 @@
   },
   "overrides": {
     "vite": "^8.0.0-beta.13"
-  }
+  },
+  "scripts": {
+  "deploy": "gh-pages -d src"
+}
 }
