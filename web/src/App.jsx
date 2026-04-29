@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useSwipeable } from "react-swipeable"; 
-import HeartIcon from '../../data/images/heart-regular-full.svg';
-import SkipIcon from '../../data/images/xmark-solid-full.svg';
+import HeartIcon from '../public/assets/img/LikeLogo.svg';
+import SkipIcon from '../public/assets/img/SkipLogo.svg';
 
 const API = import.meta.env.DEV 
   ? "http://localhost:8000"  
@@ -104,19 +104,19 @@ function Card({ item, onLike, onSkip }) {
         {/* SKIP BUTTON */}
         <button
           style={{
-            width: 90,
-            height: 90,
-            marginLeft: 15,
+            width: 300,
+            height: 85,
+            marginLeft: -80,
             marginTop: -45, 
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderColor: "#213547",
-            border: "5px solid #213547",
-            borderRadius: "50%",
+            alignItems: "right",
+            justifyContent: "right",
+            borderColor: "#ffffff",
+            border: "5px solid #ffffff",
+            borderRadius: "25px",
             transform: `scale(${skipScale})`,
             transition: "transform 120ms ease-out",
-            backgroundColor: "#FFF4EA",
+            backgroundColor: "#000000",
           }}
           onClick={() => onSkip(item)}
         >
@@ -126,7 +126,7 @@ function Card({ item, onLike, onSkip }) {
             style={{
               width: 55,
               height: 55,
-              marginTop: -5, // optional small lift upward
+
               transform: `scale(${skipScale})`,
               transition: "transform 120ms ease-out",
             }}
@@ -136,20 +136,20 @@ function Card({ item, onLike, onSkip }) {
         {/* LIKE BUTTON */}
         <button
           style={{
-            width: 90,
-            height: 90,
-            marginRight: 15,
+            width: 300,
+            height: 85,
+            marginRight: -80,
             marginTop: -40, // optional small lift upward
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: "left",
+            justifyContent: "left",
             marginLeft: "auto",
-            borderColor: "#D84040",
-            border: "5px solid #D84040",
-            borderRadius: "50%",
+            borderColor: "#ffffff",
+            border: "5px solid #ffffff",
+            borderRadius: "25px",
             transform: `scale(${likeScale})`,
             transition: "transform 120ms ease-out",
-            backgroundColor: "#FFF4EA",
+            backgroundColor: "#000000",
           }}
           onClick={() => onLike(item)}
         >
@@ -159,7 +159,7 @@ function Card({ item, onLike, onSkip }) {
             style={{
               width: 55,
               height: 55,
-              marginTop: -5, // optional small lift upward
+              
               transform: `scale(${likeScale})`,
               transition: "transform 120ms ease-out",
             }}

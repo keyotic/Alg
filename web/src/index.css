@@ -20,11 +20,11 @@ a {
 }
 
 
-.body {
+.body{
   margin: 0;
   display: flex;
   place-items: center;
-  min-width: 320px;
+  min-width: 100vh;
   min-height: 100vh;
   background-color: #000000;
   background-image: url('../public/assets/img/Rectangle3802.png');
@@ -35,7 +35,7 @@ body{
     margin: 0;
     display: flex;
     place-items: center;
-    min-width: 320px;
+    min-width: 100vh;
     min-height: 100vh;
     background-color: #000000;
     background-image: url('../public/assets/img/Rectangle3803.png'), url('../public/assets/img/AlgoracleVisual.gif') ;
@@ -47,17 +47,17 @@ body{
 
 
 h1 {
-  width: 655px;
+
   color: #FFF;
   text-align: center;
   text-shadow: 0 27px 42.8px rgba(0, 0, 0, 0.50);
   font-family: Cesso;
-  font-size: 135px;
+  font-size: 135pt;
   font-style: normal;
   font-weight: 400;
   line-height: normal;
-  margin-left: 44px;
-  margin-top: 500px;
+  margin-top: 600px;
+  allign-self: center;
 }
 
 button {
@@ -89,8 +89,8 @@ button:focus-visible {
   }
 
 .enter{    
-    margin-top: 800px;
-    margin-left: -500px;
+    margin-top: 1000px;
+    margin-left: -600px;
     width: 435px;
     height: 59px;
     border-radius: 19px;
@@ -106,6 +106,8 @@ button:focus-visible {
     font-weight: 400;
     line-height: normal;
     color: #ffffff;
+    align-self: bottom, center;
+    
     
 }
 .introtext{
