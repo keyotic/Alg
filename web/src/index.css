@@ -24,7 +24,7 @@ a {
   margin: 0;
   display: flex;
   place-items: center;
-  min-width: 100vh;
+  min-width: 1024px;
   min-height: 100vh;
   background-color: #000000;
   background-image: url('../public/assets/img/Rectangle3802.png');
@@ -35,7 +35,7 @@ body{
     margin: 0;
     display: flex;
     place-items: center;
-    min-width: 100vh;
+    min-width: 1024px;
     min-height: 100vh;
     background-color: #000000;
     background-image: url('../public/assets/img/Rectangle3803.png'), url('../public/assets/img/AlgoracleVisual.gif') ;
@@ -57,7 +57,7 @@ h1 {
   font-weight: 400;
   line-height: normal;
   margin-top: 550px;
-  margin-left: 20px;
+  margin-left: 100px;
 }
 
 button {
@@ -89,8 +89,8 @@ button:focus-visible {
   }
 
 .enter{    
-    margin-top: 1000px;
-    margin-left: -550px;
+    margin-top: 850px;
+    margin-left: -650px;
     width: 550px;
     height: 60px;
     border-radius: 19px;
