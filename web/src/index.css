@@ -47,17 +47,17 @@ body{
 
 
 h1 {
-
+  display: flex;
   color: #FFF;
   text-align: center;
   text-shadow: 0 27px 42.8px rgba(0, 0, 0, 0.50);
   font-family: Cesso;
-  font-size: 135pt;
+  font-size: 125pt;
   font-style: normal;
   font-weight: 400;
   line-height: normal;
-  margin-top: 600px;
-  allign-self: center;
+  margin-top: 550px;
+  margin-left: 20px;
 }
 
 button {
@@ -90,9 +90,9 @@ button:focus-visible {
 
 .enter{    
     margin-top: 1000px;
-    margin-left: -600px;
-    width: 435px;
-    height: 59px;
+    margin-left: -550px;
+    width: 550px;
+    height: 60px;
     border-radius: 19px;
     display: flex;
     justify-content: center;
