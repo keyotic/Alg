@@ -52,7 +52,7 @@ h1 {
   text-align: center;
   text-shadow: 0 27px 42.8px rgba(0, 0, 0, 0.50);
   font-family: Cesso;
-  font-size: 125pt;
+  font-size: 135pt;
   font-style: normal;
   font-weight: 400;
   line-height: normal;
@@ -96,7 +96,7 @@ button:focus-visible {
     border-radius: 19px;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: end;
     text-align: center;
     background-color: #00000000;
     border: 6px solid #FFF;
@@ -112,7 +112,9 @@ button:focus-visible {
 }
 .introtext{
    margin-top: 800px;
+   margin-left: 2em;
    font-size : 26pt;
+   font-weight: bold;
    font-family: mr-eaves-xl-modern, sans-serif;
    color : #FFF;
    text-align: center;
