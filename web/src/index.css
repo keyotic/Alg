@@ -176,3 +176,17 @@ button:focus-visible {
     margin-left: 13em;
     margin-top: 73em;
 }
+
+.namefield{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: left;
+    width: 800px;
+    height: 180px;
+    font-size : 30pt;
+    font-weight: bold;
+    font-family: mr-eaves-xl-modern, sans-serif;
+    margin-top: 400px;
+    margin-left: 3em;
+}
