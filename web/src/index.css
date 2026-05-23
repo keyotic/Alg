@@ -147,3 +147,17 @@ button:focus-visible {
     margin-left: 13em;
     margin-top: 73em;
 }
+
+.fintrotext{
+   margin-top: 800px;
+   margin-left: 3em;
+   width: 800px;
+   height: 180px;
+   font-size : 30pt;
+   font-weight: bold;
+   font-family: mr-eaves-xl-modern, sans-serif;
+   color : #FFF;
+   text-align: center;
+   margin-right: -11em;
+
+}
