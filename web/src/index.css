@@ -189,14 +189,15 @@ button:focus-visible {
     background-color: #00000000;
     color: #ffffff;
 }
+
 .name-input{
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: left;
     width: 600px;
-    height: 70px
-    font-size : 30pt;
+    height: 70px;
+    font-size: 30pt;
     font-weight: bold;
     font-family: mr-eaves-xl-modern, sans-serif;
     background-color: #000;
