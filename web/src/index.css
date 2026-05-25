@@ -203,4 +203,5 @@ button:focus-visible {
     background-color: #000;
     color: #ffffff;
     border-radius: 35px;
+    text-indent: 32px;
 }
