@@ -178,7 +178,7 @@ button:focus-visible {
 }
 
 .namefield{
-    padding: 100px 50px;
+    padding: 75px 50px;
     display: flex;
     justify-content: center;
     align-items: center;
