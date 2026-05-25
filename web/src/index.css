@@ -182,14 +182,24 @@ button:focus-visible {
     display: flex;
     justify-content: center;
     align-items: center;
-    text-align: left;
     width: 700px;
+    height: 100px;
+    margin-top: 400px;
+    margin-left: 3em;
+    background-color: #00000000;
+    color: #ffffff;
+}
+.name-input{
+    padding: 0.6em 1em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: left;
+    width: 600px;
     height: 100px;
     font-size : 30pt;
     font-weight: bold;
     font-family: mr-eaves-xl-modern, sans-serif;
-    margin-top: 400px;
-    margin-left: 3em;
     background-color: #00000000;
     color: #ffffff;
 }
