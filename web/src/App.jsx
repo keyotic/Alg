@@ -53,7 +53,7 @@ function Card({ item, onLike, onSkip }) {
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
   return (
-    <div style={{ width: 1024, borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ width: 1024, overflow: "hidden" }}>
 
       {/* SWIPING AREA — THIS MOVES */}
       <div
@@ -73,7 +73,7 @@ function Card({ item, onLike, onSkip }) {
         <img
           src={item.path || item.url}
           alt={item.title || item.item_id}
-          style={{ width: "90%", height: 1150, objectFit: "cover", marginLeft: "3em", borderRadius: 20 }}
+          style={{ width: "90%", height: 1150, objectFit: "cover", marginLeft: "3em", borderRadius: 20, }}
         />
 
         <div style={{ padding: 12 }}>
