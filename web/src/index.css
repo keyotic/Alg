@@ -61,16 +61,12 @@ h1 {
 }
 
 h2 {
-  display: flex;
   color: #FFF;
   text-align: center;
   font-family: Cesso;
   font-size: 40pt;
   font-style: normal;
   line-height: normal;
-  align-self: start;
-  margin-left: 7em;
-  margin-top: -10px;
 }
 
 button {
@@ -232,4 +228,12 @@ button:focus-visible {
     border: 4px solid #FFF;
     color: #ffffff;
     margin-left: -5em;
+}
+
+.titleswipe{
+  margin-top: -50em;
+}
+
+.exit {
+  margin-right: 1em;
 }
