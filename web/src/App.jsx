@@ -73,7 +73,7 @@ function Card({ item, onLike, onSkip }) {
         <img
           src={item.path || item.url}
           alt={item.title || item.item_id}
-          style={{ width: "100%", height: 1150, objectFit: "cover" }}
+          style={{ width: "90%", height: 1150, objectFit: "cover", marginLeft: "3em", borderRadius: 20 }}
         />
 
         <div style={{ padding: 12 }}>
