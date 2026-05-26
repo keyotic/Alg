@@ -239,7 +239,7 @@ button:focus-visible {
 }
 
 .exit {
-  margin-left: 18em;
+  margin-left: 16em;
   display: flex;
   justify-content: end;
   background-color: transparent;
