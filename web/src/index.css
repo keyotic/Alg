@@ -60,6 +60,16 @@ h1 {
   margin-left: 100px;
 }
 
+h2{
+  display: flex;
+  color: #FFF;
+  text-align: center;
+  font-family: Cesso;
+  font-size: 40pt;
+  font-style: normal;
+  line-height: normal;
+}
+
 button {
   border-radius: 500px;
   border: 10px;
