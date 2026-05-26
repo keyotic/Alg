@@ -173,6 +173,7 @@ function Card({ item, onLike, onSkip }) {
 
 export default function App() {
   const [queue, setQueue] = useState([]);
+  const [interactionCount, setInteractionCount] = useState(0);
 
   const fetchFeed = async () => {
     const res = await axios.post(`${API}/feed`, {
@@ -191,17 +192,33 @@ export default function App() {
     }).catch(() => {});
   };
 
-  // Optimistic UI update for instant next card
-  const onLike = (item) => {
+  const goToNextPage = () => {
+    window.location.href = "final_intro.html";
+  };
+
+  const handleInteraction = (item, action) => {
     setQueue(q => q.slice(1));
-    sendInteraction(item, "like");
+    sendInteraction(item, action);
+
+    setInteractionCount(prev => {
+      const next = prev + 1;
+      if (next >= 20) {
+        setTimeout(() => {
+          goToNextPage();
+        }, 250);
+      }
+      return next;
+    });
+
     if (queue.length < 5) fetchFeed();
   };
 
+  const onLike = (item) => {
+    handleInteraction(item, "like");
+  };
+
   const onSkip = (item) => {
-    setQueue(q => q.slice(1));
-    sendInteraction(item, "skip");
-    if (queue.length < 5) fetchFeed();
+    handleInteraction(item, "skip");
   };
 
   useEffect(() => {
