@@ -68,6 +68,9 @@ h2 {
   font-size: 40pt;
   font-style: normal;
   line-height: normal;
+  align-self: start;
+  margin-left: 7em;
+  margin-top: -15px;
 }
 
 button {
