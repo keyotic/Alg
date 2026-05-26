@@ -53,7 +53,7 @@ function Card({ item, onLike, onSkip }) {
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
   return (
-    <div style={{ width: 1024, overflow: "hidden", marginLeft: "-38.5em", }}>
+    <div style={{ width: 1024, overflow: "hidden", }}>
 
       {/* SWIPING AREA — THIS MOVES */}
       <div
