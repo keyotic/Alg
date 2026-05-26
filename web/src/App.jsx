@@ -193,7 +193,7 @@ export default function App() {
   };
 
   const goToNextPage = () => {
-    window.location.href = "final_intro.html";
+    window.location.href = "end1.html";
   };
 
   const handleInteraction = (item, action) => {
