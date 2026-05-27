@@ -1,4 +1,9 @@
-import os, json, time
+import os
+import json
+import time
+import traceback
+import logging
+
 import numpy as np
 import faiss
 from fastapi import FastAPI, HTTPException
@@ -8,7 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 
-# Go TWO levels up: backend/app/main.py -> backend/app -> backend -> AlgorithmCode (root)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("alg-backend")
+
+
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
@@ -21,22 +29,33 @@ VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vect
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
 
 
-# Load FAISS + metadata on startup
 index = faiss.read_index(INDEX_PATH)
+
 with open(IDS_PATH, "r") as f:
     ITEM_IDS = json.load(f)
 
-ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
+ITEM_VECS = np.load(VECTORS_PATH)
 
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
+missing_in_meta = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
+extra_in_meta = [iid for iid in ITEMS_META if iid not in ITEM_IDS]
+
+logger.info("ITEM_IDS count=%s | ITEMS_META count=%s", len(ITEM_IDS), len(ITEMS_META))
+
+if missing_in_meta:
+    logger.warning("ITEM_IDS missing from ITEMS_META: %s", missing_in_meta[:20])
+    logger.warning("Total ITEM_IDS missing from ITEMS_META: %s", len(missing_in_meta))
+
+if extra_in_meta:
+    logger.warning("ITEMS_META missing from ITEM_IDS: %s", extra_in_meta[:20])
+    logger.warning("Total ITEMS_META missing from ITEM_IDS: %s", len(extra_in_meta))
+
 EMBED_DIM = ITEM_VECS.shape[1]
 
-
-# In-memory user vectors & seen set for demo
-USER_VEC = {}   # user_id -> np.array (d,)
-USER_SEEN = {}  # user_id -> set(item_id)
+USER_VEC = {}
+USER_SEEN = {}
 
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
@@ -51,7 +70,7 @@ class FeedRequest(BaseModel):
 class Interaction(BaseModel):
     user_id: str
     item_id: str
-    action: str   # "like" or "skip"
+    action: str
 
 
 class ResetRequest(BaseModel):
@@ -60,18 +79,17 @@ class ResetRequest(BaseModel):
 
 app = FastAPI()
 
-
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://keyotic.github.io"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://keyotic.github.io",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# Serve images
 app.mount(
     "/images",
     StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")),
@@ -81,7 +99,12 @@ app.mount(
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "count": len(ITEM_IDS)}
+    return {
+        "ok": True,
+        "count": len(ITEM_IDS),
+        "meta_count": len(ITEMS_META),
+        "version": "main.py-safe-meta-v2"
+    }
 
 
 def get_user_vec(uid: str):
@@ -102,8 +125,12 @@ def has_seen(uid: str, item_id: str):
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
     u = USER_VEC.get(uid)
+
     if u is None:
-        u = item_vec.copy() if like else np.random.randn(EMBED_DIM).astype("float32")
+        if like:
+            u = item_vec.copy()
+        else:
+            u = np.random.randn(EMBED_DIM).astype("float32")
         u /= np.linalg.norm(u) + 1e-8
     else:
         if like:
@@ -111,6 +138,7 @@ def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 
         else:
             u = lam * u - (1 - lam) * 0.1 * item_vec
         u /= np.linalg.norm(u) + 1e-8
+
     USER_VEC[uid] = u
     return u
 
@@ -119,12 +147,14 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
     now = time.time()
     alpha, beta, gamma = 0.85, 0.10, 0.05
     scored = []
+
     for row_idx, sim in zip(idxes, sims):
         item_id = ITEM_IDS[row_idx]
         pop = POPULARITY.get(item_id, 0.0)
         recency = np.exp(-max(0, now - CREATED_AT.get(item_id, now)) / (7 * 24 * 3600))
-        s = alpha * float(sim) + beta * pop + gamma * recency
-        scored.append((item_id, s, row_idx))
+        score = alpha * float(sim) + beta * pop + gamma * recency
+        scored.append((item_id, score, row_idx))
+
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:topk]
 
@@ -173,12 +203,26 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
 
 
 def convert_path_to_url(item):
-    """Convert local file path to HTTP URL for frontend"""
     result = item.copy()
+
+    if "path" not in result:
+        logger.error("Missing 'path' in item metadata: %s", result)
+        return result
+
+    if not isinstance(result["path"], str):
+        logger.error("Invalid 'path' type in item metadata: %s", result)
+        return result
+
     if result["path"].startswith("data/"):
         filename = result["path"].split("/")[-1]
+        full_path = os.path.join(PROJECT_ROOT, "data", "images", filename)
+
+        if not os.path.exists(full_path):
+            logger.error("Image file missing on disk: %s | item=%s", filename, result)
+
         base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
         result["path"] = f"{base_url}/images/{filename}"
+
     return result
 
 
@@ -188,63 +232,122 @@ def feed(req: FeedRequest):
     u = get_user_vec(uid)
     k_candidates = max(req.limit * 5, 100)
 
-    if u is None:
-        items = []
-        for item_id in ITEM_IDS:
-            if not req.exclude_seen or not has_seen(uid, item_id):
-                items.append(item_id)
-            if len(items) >= req.limit:
-                break
+    logger.info("---- /feed start ----")
+    logger.info("user_id=%s limit=%s exclude_seen=%s", uid, req.limit, req.exclude_seen)
+    logger.info("user_vec_exists=%s", u is not None)
 
-        result = [convert_path_to_url(ITEMS_META[i]) for i in items]
-        return {"items": result}
+    try:
+        if u is None:
+            items = []
+            for item_id in ITEM_IDS:
+                if not req.exclude_seen or not has_seen(uid, item_id):
+                    items.append(item_id)
+                if len(items) >= req.limit:
+                    break
 
-    q = u.reshape(1, -1).astype("float32")
+            result = []
+            for item_id in items:
+                meta = ITEMS_META.get(item_id)
+                if meta is None:
+                    logger.error("Missing metadata during cold start for item_id=%s", item_id)
+                    continue
+                result.append(convert_path_to_url(meta))
 
-    attempts = [
-        k_candidates,
-        k_candidates * 3,
-        k_candidates * 10,
-        len(ITEM_IDS)
-    ]
+            logger.info("cold_start_items_returned=%s", len(result))
+            return {"items": result}
 
-    cand = []
+        q = u.reshape(1, -1).astype("float32")
 
-    for attempt_k in attempts:
-        attempt_k = min(attempt_k, len(ITEM_IDS))
-        sims, idxes = index.search(q, attempt_k)
-        idxes, sims = idxes[0], sims[0]
-
-        cand = [
-            (ITEM_IDS[i], sims[j], i)
-            for j, i in enumerate(idxes)
-            if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])
+        attempts = [
+            k_candidates,
+            k_candidates * 3,
+            k_candidates * 10,
+            len(ITEM_IDS),
         ]
 
-        if len(cand) >= req.limit:
-            break
+        cand = []
 
-    # Last resort: reset seen items
-    if len(cand) < req.limit:
-        USER_SEEN[uid] = set()
-        sims, idxes = index.search(q, k_candidates)
-        idxes, sims = idxes[0], sims[0]
-        cand = [(ITEM_IDS[i], sims[j], i) for j, i in enumerate(idxes)]
+        for attempt_k in attempts:
+            attempt_k = min(attempt_k, len(ITEM_IDS))
+            sims, idxes = index.search(q, attempt_k)
+            idxes, sims = idxes[0], sims[0]
 
-    scored = score_items(
-        u,
-        np.array([c[2] for c in cand]),
-        np.array([c[1] for c in cand]),
-        len(cand)
-    )
+            cand = [
+                (ITEM_IDS[i], sims[j], i)
+                for j, i in enumerate(idxes)
+                if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])
+            ]
 
-    reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
-    final_items = [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked]
-    return {"items": final_items}
+            logger.info("attempt_k=%s candidate_count=%s", attempt_k, len(cand))
+
+            if len(cand) >= req.limit:
+                break
+
+        if len(cand) < req.limit:
+            logger.warning("Not enough candidates; resetting seen set for user=%s", uid)
+            USER_SEEN[uid] = set()
+
+            sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
+            idxes, sims = idxes[0], sims[0]
+            cand = [(ITEM_IDS[i], sims[j], i) for j, i in enumerate(idxes)]
+
+            logger.info("candidate_count_after_seen_reset=%s", len(cand))
+
+        if not cand:
+            logger.error("No candidates found for user=%s", uid)
+            return {"items": []}
+
+        scored = score_items(
+            u,
+            np.array([c[2] for c in cand]),
+            np.array([c[1] for c in cand]),
+            len(cand)
+        )
+
+        logger.info("scored_count=%s", len(scored))
+
+        if not scored:
+            logger.error("No scored items for user=%s", uid)
+            return {"items": []}
+
+        reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
+        logger.info("reranked_count=%s", len(reranked))
+
+        if not reranked:
+            logger.warning("No reranked items for user=%s", uid)
+            return {"items": []}
+
+        final_items = []
+        missing_meta_ids = []
+
+        for (iid, _, _) in reranked:
+            meta = ITEMS_META.get(iid)
+            if meta is None:
+                missing_meta_ids.append(iid)
+                logger.error("Missing metadata for reranked item_id=%s", iid)
+                continue
+
+            final_items.append(convert_path_to_url(meta))
+
+        if missing_meta_ids:
+            logger.warning("Skipped reranked items with missing metadata: %s", missing_meta_ids)
+
+        logger.info("final_items_count=%s", len(final_items))
+        logger.info("---- /feed end ----")
+
+        return {"items": final_items}
+
+    except Exception as e:
+        logger.error("Feed crashed for user=%s error=%s", uid, str(e))
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Feed failed: {str(e)}")
 
 
 @app.post("/interactions")
 def interactions(evt: Interaction):
+    logger.info("---- /interactions start ----")
+    logger.info("user_id=%s item_id=%s action=%s", evt.user_id, evt.item_id, evt.action)
+
     if evt.action not in ("like", "skip"):
         raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -253,18 +356,33 @@ def interactions(evt: Interaction):
     except ValueError:
         raise HTTPException(status_code=404, detail="Unknown item_id")
 
-    item_vec = ITEM_VECS[row_idx]
-    like = (evt.action == "like")
+    try:
+        item_vec = ITEM_VECS[row_idx]
+        like = evt.action == "like"
 
-    update_user_vector(evt.user_id, item_vec, like)
-    mark_seen(evt.user_id, evt.item_id)
-    POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
+        update_user_vector(evt.user_id, item_vec, like)
+        mark_seen(evt.user_id, evt.item_id)
+        POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    return {"ok": True}
+        logger.info(
+            "interaction_applied like=%s seen_count=%s popularity=%s",
+            like,
+            len(USER_SEEN.get(evt.user_id, set())),
+            POPULARITY.get(evt.item_id, 0.0),
+        )
+        logger.info("---- /interactions end ----")
+
+        return {"ok": True}
+
+    except Exception as e:
+        logger.error("Interaction crashed user=%s item_id=%s error=%s", evt.user_id, evt.item_id, str(e))
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Interaction failed: {str(e)}")
 
 
 @app.post("/reset")
 def reset_user(req: ResetRequest):
+    logger.info("Resetting session for user_id=%s", req.user_id)
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
     return {"ok": True}

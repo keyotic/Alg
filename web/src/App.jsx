@@ -277,37 +277,6 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-      <div style={{ width: "100%", maxWidth: 420, position: "absolute", top: 32 }}>
-        <div
-          role="progressbar"
-          aria-label="Interaction progress"
-          aria-valuemin={0}
-          aria-valuemax={maxInteractions}
-          aria-valuenow={interactionCount}
-          style={{
-            width: "100%",
-            height: 12,
-            backgroundColor: "#000000",
-            borderRadius: 999,
-            overflow: "hidden",
-            border: "5px solid #ffffff",
-            marginTop: "79em",
-            marginLeft: "-32em",
-            padding: 25,
-          }}
-        >
-          <div
-            style={{
-              width: `${progressPercent}%`,
-              height: "100%",
-              backgroundColor: "#C0FD02",
-              borderRadius: 999,
-              transition: "width 180ms ease",
-            }}
-          />
-        </div>
-      </div>
-
       {loading ? (
         <div style={{ color: "#ffffff" }}>Loading…</div>
       ) : error ? (
@@ -316,12 +285,54 @@ export default function App() {
           <button onClick={fetchFeed}>Try again</button>
         </div>
       ) : queue.length ? (
-        <Card
-          key={queue[0].item_id}
-          item={queue[0]}
-          onLike={onLike}
-          onSkip={onSkip}
-        />
+        <>
+          <Card
+            key={queue[0].item_id}
+            item={queue[0]}
+            onLike={onLike}
+            onSkip={onSkip}
+          />
+
+          <div
+            style={{
+              position: "fixed",
+              bottom: "2rem",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "420px",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              role="progressbar"
+              aria-label="Interaction progress"
+              aria-valuemin={0}
+              aria-valuemax={maxInteractions}
+              aria-valuenow={interactionCount}
+              style={{
+                width: "100%",
+                height: 12,
+                backgroundColor: "#000000",
+                borderRadius: 999,
+                overflow: "hidden",
+                border: "5px solid #ffffff",
+                padding: 25,
+                marginTop: "-11em",
+                marginLeft: "-2em",
+              }}
+            >
+              <div
+                style={{
+                  width: `${progressPercent}%`,
+                  height: "100%",
+                  backgroundColor: "#C0FD02",
+                  borderRadius: 999,
+                  transition: "width 180ms ease",
+                }}
+              />
+            </div>
+          </div>
+        </>
       ) : (
         <div style={{ color: "#ffffff" }}>No more images available.</div>
       )}
