@@ -53,7 +53,7 @@ function Card({ item, onLike, onSkip }) {
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
   return (
-    <div style={{ width: 1024, overflow: "hidden", marginLeft: "-64em", }}>
+    <div style={{ width: 1024, overflow: "hidden", marginLeft: "-61em", }}>
 
       {/* SWIPING AREA — THIS MOVES */}
       <div
@@ -175,6 +175,9 @@ export default function App() {
   const [queue, setQueue] = useState([]);
   const [interactionCount, setInteractionCount] = useState(0);
 
+  const maxInteractions = 20;
+  const progressPercent = Math.min((interactionCount / maxInteractions) * 100, 100);
+
   const fetchFeed = async () => {
     const res = await axios.post(`${API}/feed`, {
       user_id: USER_ID,
@@ -193,7 +196,7 @@ export default function App() {
   };
 
   const goToNextPage = () => {
-    window.location.href = "end1.html";
+    window.location.href = `${import.meta.env.BASE_URL}end1.html`;
   };
 
   const handleInteraction = (item, action) => {
@@ -202,24 +205,21 @@ export default function App() {
 
     setInteractionCount(prev => {
       const next = prev + 1;
-      if (next >= 20) {
+
+      if (next >= maxInteractions) {
         setTimeout(() => {
           goToNextPage();
         }, 250);
       }
+
       return next;
     });
 
     if (queue.length < 5) fetchFeed();
   };
 
-  const onLike = (item) => {
-    handleInteraction(item, "like");
-  };
-
-  const onSkip = (item) => {
-    handleInteraction(item, "skip");
-  };
+  const onLike = (item) => handleInteraction(item, "like");
+  const onSkip = (item) => handleInteraction(item, "skip");
 
   useEffect(() => {
     fetchFeed();
@@ -227,6 +227,39 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
+      <div style={{ width: "100%", maxWidth: 420, position: "absolute", top: 32 }}>
+        <div
+          role="progressbar"
+          aria-label="Interaction progress"
+          aria-valuemin={0}
+          aria-valuemax={maxInteractions}
+          aria-valuenow={interactionCount}
+          style={{
+            width: "100%",
+            height: 12,
+            backgroundColor: "#000000",
+            borderRadius: 999,
+            overflow: "hidden",
+            border: "5px solid #ffffff",
+            marginTop: "79em",
+            marginLeft: "-32em",
+            padding: 25,
+          }}
+        >
+          <div
+            style={{
+              width: `${progressPercent}%`,
+              height: "100%",
+              backgroundColor: "#C0FD02",
+              borderRadius: 999,
+              transition: "width 180ms ease",
+            }}
+          />
+        </div>
+
+
+      </div>
+
       {queue.length ? (
         <Card
           key={queue[0].item_id}
