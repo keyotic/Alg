@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { useSwipeable } from "react-swipeable"; 
-import HeartIcon from '../public/assets/img/LikeLogo.svg';
-import SkipIcon from '../public/assets/img/SkipLogo.svg';
+import { useSwipeable } from "react-swipeable";
+import HeartIcon from "../public/assets/img/LikeLogo.svg";
+import SkipIcon from "../public/assets/img/SkipLogo.svg";
 
-const API = import.meta.env.DEV 
-  ? "http://localhost:8000"  
-  : "https://alg-backend.onrender.com"; 
-const USER_ID = "demo-user-1";
+const API = import.meta.env.DEV
+  ? "http://localhost:8000"
+  : "https://alg-backend.onrender.com";
+
+const USER_ID = `user-${crypto.randomUUID()}`;
 
 function Card({ item, onLike, onSkip }) {
   const [dragX, setDragX] = useState(0);
@@ -34,17 +35,14 @@ function Card({ item, onLike, onSkip }) {
     preventScrollOnSwipe: true,
   });
 
-  // Reset animation when switching to next card
   useEffect(() => {
     setDragX(0);
     setExitDir(null);
   }, [item?.item_id || item?.title || item]);
 
-  // --- Button + icon grow animation ---
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-  const maxGrow = 0.20;  // +20% bigger
-  const intensity = 220; // px to reach max growth
+  const maxGrow = 0.2;
+  const intensity = 220;
 
   const likeScale =
     dragX > 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
@@ -53,9 +51,7 @@ function Card({ item, onLike, onSkip }) {
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
   return (
-    <div style={{ width: 1024, overflow: "hidden", marginLeft: "-61em", }}>
-
-      {/* SWIPING AREA — THIS MOVES */}
+    <div style={{ width: 1024, overflow: "hidden", marginLeft: "-61em" }}>
       <div
         {...handlers}
         style={{
@@ -73,7 +69,13 @@ function Card({ item, onLike, onSkip }) {
         <img
           src={item.path || item.url}
           alt={item.title || item.item_id}
-          style={{ width: "90%", height: 1150, objectFit: "cover", marginLeft: "3em", borderRadius: 20, }}
+          style={{
+            width: "90%",
+            height: 1150,
+            objectFit: "cover",
+            marginLeft: "3em",
+            borderRadius: 20,
+          }}
         />
 
         <div style={{ padding: 12 }}>
@@ -90,24 +92,21 @@ function Card({ item, onLike, onSkip }) {
         </div>
       </div>
 
-      {/* STATIC BUTTONS — THEY DO NOT MOVE WITH SWIPE */}
       <div
         style={{
           padding: 12,
           display: "flex",
           gap: 8,
           justifyContent: "center",
-          marginTop: -10, // optional small lift upward
+          marginTop: -10,
         }}
       >
-
-        {/* SKIP BUTTON */}
         <button
           style={{
             width: 300,
             height: 85,
             marginLeft: -80,
-            marginTop: -45, 
+            marginTop: -45,
             display: "flex",
             alignItems: "right",
             justifyContent: "right",
@@ -126,20 +125,18 @@ function Card({ item, onLike, onSkip }) {
             style={{
               width: 55,
               height: 55,
-
               transform: `scale(${skipScale})`,
               transition: "transform 120ms ease-out",
             }}
           />
         </button>
 
-        {/* LIKE BUTTON */}
         <button
           style={{
             width: 300,
             height: 85,
             marginRight: -80,
-            marginTop: -40, // optional small lift upward
+            marginTop: -40,
             display: "flex",
             alignItems: "left",
             justifyContent: "left",
@@ -159,13 +156,11 @@ function Card({ item, onLike, onSkip }) {
             style={{
               width: 55,
               height: 55,
-              
               transform: `scale(${likeScale})`,
               transition: "transform 120ms ease-out",
             }}
           />
         </button>
-
       </div>
     </div>
   );
@@ -174,36 +169,69 @@ function Card({ item, onLike, onSkip }) {
 export default function App() {
   const [queue, setQueue] = useState([]);
   const [interactionCount, setInteractionCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const hasFinishedRef = useRef(false);
 
   const maxInteractions = 20;
-  const progressPercent = Math.min((interactionCount / maxInteractions) * 100, 100);
+  const progressPercent = Math.min(
+    (interactionCount / maxInteractions) * 100,
+    100
+  );
 
   const fetchFeed = async () => {
-    const res = await axios.post(`${API}/feed`, {
-      user_id: USER_ID,
-      limit: 10,
-      exclude_seen: true
-    });
-    setQueue(res.data.items);
+    try {
+      setLoading(true);
+      setError("");
+
+      const res = await axios.post(`${API}/feed`, {
+        user_id: USER_ID,
+        limit: 10,
+        exclude_seen: true,
+      });
+
+      setQueue(res.data.items || []);
+    } catch (err) {
+      console.error("Feed failed:", err);
+      setError("Could not load images. Please refresh or try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const sendInteraction = (item, action) => {
-    axios.post(`${API}/interactions`, {
-      user_id: USER_ID,
-      item_id: item.item_id,
-      action
-    }).catch(() => {});
+  const sendInteraction = async (item, action) => {
+    try {
+      await axios.post(`${API}/interactions`, {
+        user_id: USER_ID,
+        item_id: item.item_id,
+        action,
+      });
+    } catch (err) {
+      console.error("Interaction failed:", err);
+    }
   };
 
-  const goToNextPage = () => {
+  const resetSession = async () => {
+    try {
+      await axios.post(`${API}/reset`, {
+        user_id: USER_ID,
+      });
+    } catch (err) {
+      console.error("Reset failed:", err);
+    }
+  };
+
+  const goToNextPage = async () => {
+    hasFinishedRef.current = true;
+    await resetSession();
     window.location.href = `${import.meta.env.BASE_URL}end1.html`;
   };
 
   const handleInteraction = (item, action) => {
-    setQueue(q => q.slice(1));
+    setQueue((q) => q.slice(1));
     sendInteraction(item, action);
 
-    setInteractionCount(prev => {
+    setInteractionCount((prev) => {
       const next = prev + 1;
 
       if (next >= maxInteractions) {
@@ -214,8 +242,6 @@ export default function App() {
 
       return next;
     });
-
-    if (queue.length < 5) fetchFeed();
   };
 
   const onLike = (item) => handleInteraction(item, "like");
@@ -223,6 +249,30 @@ export default function App() {
 
   useEffect(() => {
     fetchFeed();
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !error && queue.length < 5 && interactionCount < maxInteractions) {
+      fetchFeed();
+    }
+  }, [queue.length, loading, error, interactionCount]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (hasFinishedRef.current) return;
+
+      const data = JSON.stringify({ user_id: USER_ID });
+      navigator.sendBeacon(
+        `${API}/reset`,
+        new Blob([data], { type: "application/json" })
+      );
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   return (
@@ -256,11 +306,16 @@ export default function App() {
             }}
           />
         </div>
-
-
       </div>
 
-      {queue.length ? (
+      {loading ? (
+        <div style={{ color: "#ffffff" }}>Loading…</div>
+      ) : error ? (
+        <div style={{ color: "#ffffff", textAlign: "center" }}>
+          <p>{error}</p>
+          <button onClick={fetchFeed}>Try again</button>
+        </div>
+      ) : queue.length ? (
         <Card
           key={queue[0].item_id}
           item={queue[0]}
@@ -268,7 +323,7 @@ export default function App() {
           onSkip={onSkip}
         />
       ) : (
-        <div>Loading…</div>
+        <div style={{ color: "#ffffff" }}>No more images available.</div>
       )}
     </div>
   );
