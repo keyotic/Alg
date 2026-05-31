@@ -12,13 +12,16 @@ from fastapi.staticfiles import StaticFiles
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
+
 ROOT_ARTIFACTS = os.path.join(PROJECT_ROOT, "artifacts")
 ROOT_DATA = os.path.join(PROJECT_ROOT, "data")
+
 
 INDEX_PATH = os.getenv("INDEX_PATH", os.path.join(ROOT_ARTIFACTS, "faiss.index"))
 IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
+
 
 # Load FAISS + metadata on startup
 index = faiss.read_index(INDEX_PATH)
@@ -28,11 +31,14 @@ ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
+
 EMBED_DIM = ITEM_VECS.shape[1]
+
 
 # In-memory user vectors & seen set for demo
 USER_VEC = {}   # user_id -> np.array (d,)
 USER_SEEN = {}  # user_id -> set(item_id)
+
 
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
@@ -52,6 +58,7 @@ class Interaction(BaseModel):
 
 app = FastAPI()
 
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +67,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Serve images
 app.mount("/images", StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")), name="images")
@@ -118,7 +126,6 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
 def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0.7):
     selected = []
     selected_vecs = []
-    cand_vecs = ITEM_VECS[[row_idx for (_, _, row_idx) in candidates]]
     cand_items = [(item_id, score, row_idx) for (item_id, score, row_idx) in candidates]
 
     if not cand_items:
@@ -155,60 +162,89 @@ def convert_path_to_url(item):
     result = item.copy()
     if result['path'].startswith('data/'):
         filename = result['path'].split('/')[-1]
-        # Use full backend URL so it works from any frontend domain
         base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
         result['path'] = f"{base_url}/images/{filename}"
     return result
-
 
 
 @app.post("/feed")
 def feed(req: FeedRequest):
     uid = req.user_id
     u = get_user_vec(uid)
-    k_candidates = max(req.limit*5, 100)
+    k_candidates = max(req.limit * 5, 100)
 
     if u is None:
+        # Larger initial buffer so early skips don't exhaust the seen set
         items = []
         for item_id in ITEM_IDS:
             if not req.exclude_seen or not has_seen(uid, item_id):
                 items.append(item_id)
-            if len(items) >= req.limit:
+            if len(items) >= req.limit * 3:
                 break
-        result = [convert_path_to_url(ITEMS_META[i]) for i in items]
+        result = [convert_path_to_url(ITEMS_META[i]) for i in items[:req.limit]]
         return {"items": result}
 
     q = u.reshape(1, -1).astype("float32")
-    
+
     # Try progressively wider searches
     attempts = [
-        k_candidates,      # 100 items
-        k_candidates * 3,  # 300 items
-        k_candidates * 10, # 1000 items
-        len(ITEM_IDS)      # All items
+        k_candidates,       # 100 items
+        k_candidates * 3,   # 300 items
+        k_candidates * 10,  # 1000 items
+        len(ITEM_IDS)       # All items
     ]
-    
+
     cand = []
-    
+
     for attempt_k in attempts:
         attempt_k = min(attempt_k, len(ITEM_IDS))
         sims, idxes = index.search(q, attempt_k)
         idxes, sims = idxes[0], sims[0]
-        
-        cand = [(ITEM_IDS[i], sims[j], i) for j, i in enumerate(idxes)
-                if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])]
-        
+
+        cand = [
+            (ITEM_IDS[i], sims[j], i)
+            for j, i in enumerate(idxes)
+            if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])
+        ]
+
         if len(cand) >= req.limit:
             break
-    
-    # Last resort: reset seen items
+
+    # Smart reset: preserve liked items, clear skipped items from seen set
     if len(cand) < req.limit:
-        USER_SEEN[uid] = set()
+        liked_seen = {
+            iid for iid in USER_SEEN.get(uid, set())
+            if POPULARITY.get(iid, 0.0) > 0
+        }
+        USER_SEEN[uid] = liked_seen
+
         sims, idxes = index.search(q, k_candidates)
         idxes, sims = idxes[0], sims[0]
-        cand = [(ITEM_IDS[i], sims[j], i) for j, i in enumerate(idxes)]
+        cand = [
+            (ITEM_IDS[i], sims[j], i)
+            for j, i in enumerate(idxes)
+            if ITEM_IDS[i] not in liked_seen
+        ]
 
-    scored = score_items(u, np.array([c[2] for c in cand]), np.array([c[1] for c in cand]), len(cand))
+    # Absolute fallback: scan full catalog to guarantee a full feed
+    if len(cand) < req.limit:
+        already = {c[0] for c in cand}
+        for i, item_id in enumerate(ITEM_IDS):
+            if item_id not in already and item_id not in USER_SEEN.get(uid, set()):
+                sim = float(np.dot(u, ITEM_VECS[i]))
+                cand.append((item_id, sim, i))
+            if len(cand) >= req.limit * 2:
+                break
+
+    if not cand:
+        return {"items": []}
+
+    scored = score_items(
+        u,
+        np.array([c[2] for c in cand]),
+        np.array([c[1] for c in cand]),
+        len(cand)
+    )
     reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
     final_items = [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked]
     return {"items": final_items}
