@@ -33,10 +33,11 @@ ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
-# Drop IDs that are in item_ids.json but missing from items.json
-valid_mask = [i for i, iid in enumerate(ITEM_IDS) if iid in ITEMS_META]
-ITEM_IDS = [ITEM_IDS[i] for i in valid_mask]
-ITEM_VECS = ITEM_VECS[valid_mask]
+# Log orphaned IDs at startup — do NOT filter ITEM_IDS/ITEM_VECS
+# as FAISS row indices must stay perfectly aligned with ITEM_IDS
+orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
+if orphans:
+    print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
 
 
 EMBED_DIM = ITEM_VECS.shape[1]
@@ -78,7 +79,7 @@ async def catch_exceptions(request: Request, call_next):
     try:
         return await call_next(request)
     except Exception as e:
-        traceback.print_exc()  # prints full error to Render logs
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={"detail": str(e)},
@@ -141,7 +142,12 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
     alpha, beta, gamma = 0.85, 0.10, 0.05
     scored = []
     for row_idx, sim in zip(idxes, sims):
+        # Guard: skip FAISS rows that fall outside ITEM_IDS bounds
+        if row_idx < 0 or row_idx >= len(ITEM_IDS):
+            continue
         item_id = ITEM_IDS[row_idx]
+        if item_id not in ITEMS_META:
+            continue
         pop = POPULARITY.get(item_id, 0.0)
         recency = np.exp(-max(0, now - CREATED_AT.get(item_id, now)) / (7*24*3600))
         s = alpha*float(sim) + beta*pop + gamma*recency
@@ -205,15 +211,13 @@ def feed(req: FeedRequest):
             # Larger initial buffer so early skips don't exhaust the seen set
             items = []
             for item_id in ITEM_IDS:
+                if item_id not in ITEMS_META:
+                    continue
                 if not req.exclude_seen or not has_seen(uid, item_id):
                     items.append(item_id)
                 if len(items) >= req.limit * 3:
                     break
-            result = [
-                convert_path_to_url(ITEMS_META[i])
-                for i in items[:req.limit]
-                if i in ITEMS_META
-            ]
+            result = [convert_path_to_url(ITEMS_META[i]) for i in items[:req.limit]]
             return {"items": result}
 
         q = u.reshape(1, -1).astype("float32")
@@ -236,8 +240,9 @@ def feed(req: FeedRequest):
             cand = [
                 (ITEM_IDS[i], sims[j], i)
                 for j, i in enumerate(idxes)
-                if (not req.exclude_seen or not has_seen(uid, ITEM_IDS[i]))
-                and ITEM_IDS[i] in ITEMS_META
+                if 0 <= i < len(ITEM_IDS)                              # valid FAISS row
+                and ITEM_IDS[i] in ITEMS_META                          # exists in metadata
+                and (not req.exclude_seen or not has_seen(uid, ITEM_IDS[i]))  # not seen
             ]
 
             if len(cand) >= req.limit:
@@ -256,8 +261,9 @@ def feed(req: FeedRequest):
             cand = [
                 (ITEM_IDS[i], sims[j], i)
                 for j, i in enumerate(idxes)
-                if ITEM_IDS[i] not in liked_seen
+                if 0 <= i < len(ITEM_IDS)
                 and ITEM_IDS[i] in ITEMS_META
+                and ITEM_IDS[i] not in liked_seen
             ]
 
         # Absolute fallback: scan full catalog to guarantee a full feed
@@ -265,9 +271,9 @@ def feed(req: FeedRequest):
             already = {c[0] for c in cand}
             for i, item_id in enumerate(ITEM_IDS):
                 if (
-                    item_id not in already
+                    item_id in ITEMS_META
+                    and item_id not in already
                     and item_id not in USER_SEEN.get(uid, set())
-                    and item_id in ITEMS_META
                 ):
                     sim = float(np.dot(u, ITEM_VECS[i]))
                     cand.append((item_id, sim, i))
