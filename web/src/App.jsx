@@ -8,7 +8,7 @@ const API = import.meta.env.DEV
   ? "http://localhost:8000"
   : "https://alg-backend.onrender.com";
 
-const USER_ID = `user-${crypto.randomUUID()}`;
+const USER_ID = sessionStorage.getItem("user_id") || `user-${crypto.randomUUID()}`;
 
 function Card({ item, onLike, onSkip }) {
   const [dragX, setDragX] = useState(0);

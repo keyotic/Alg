@@ -14,7 +14,13 @@
 <script>
   const params = new URLSearchParams(window.location.search);
   const username = params.get("name") || "stranger";
-  document.getElementById("output").textContent = username + "...Nice to meet you... Let’s start getting you familiar with the platform, so I can get to know you better...";
+
+  //  Save the name so React app uses it as user_id
+  if (params.get("name")) {
+    sessionStorage.setItem("user_id", params.get("name"));
+  }
+
+  document.getElementById("output").textContent = username + "...Nice to meet you... Let's start getting you familiar with the platform, so I can get to know you better...";
 </script>
 
 <div>
@@ -23,4 +29,4 @@
   </button>
 </div>
 </body>
-</html>     
+</html>

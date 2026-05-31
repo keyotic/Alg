@@ -325,3 +325,52 @@ def reset(req: ResetRequest):
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
     return {"ok": True}
+
+# ── Admin / Debug endpoints ────────────────────────────────────────────────
+
+@app.get("/admin/users")
+def admin_users():
+    return {
+        "users": [
+            {
+                "user_id": uid,
+                "seen_count": len(USER_SEEN.get(uid, set())),
+                "has_vector": uid in USER_VEC,
+            }
+            for uid in sorted(set(list(USER_VEC.keys()) + list(USER_SEEN.keys())))
+        ]
+    }
+
+
+@app.get("/admin/user/{user_id}")
+def admin_user_detail(user_id: str):
+    seen = USER_SEEN.get(user_id, set())
+    liked = [iid for iid in seen if POPULARITY.get(iid, 0.0) > 0]
+    skipped = [iid for iid in seen if POPULARITY.get(iid, 0.0) == 0]
+
+    return {
+        "user_id": user_id,
+        "has_vector": user_id in USER_VEC,
+        "total_seen": len(seen),
+        "liked": sorted(liked),
+        "skipped": sorted(skipped),
+        "liked_count": len(liked),
+        "skipped_count": len(skipped),
+    }
+
+
+@app.get("/admin/popularity")
+def admin_popularity():
+    sorted_items = sorted(POPULARITY.items(), key=lambda x: x[1], reverse=True)
+    return {
+        "items": [
+            {"item_id": iid, "likes": int(count)}
+            for iid, count in sorted_items
+            if count > 0
+        ]
+    }
+
+
+@app.post("/admin/preview-feed/{user_id}")
+def admin_preview_feed(user_id: str, limit: int = 15):
+    return feed(FeedRequest(user_id=user_id, limit=limit, exclude_seen=True))
