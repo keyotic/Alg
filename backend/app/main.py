@@ -33,6 +33,11 @@ ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
+# Drop IDs that are in item_ids.json but missing from items.json
+valid_mask = [i for i, iid in enumerate(ITEM_IDS) if iid in ITEMS_META]
+ITEM_IDS = [ITEM_IDS[i] for i in valid_mask]
+ITEM_VECS = ITEM_VECS[valid_mask]
+
 
 EMBED_DIM = ITEM_VECS.shape[1]
 
@@ -65,8 +70,8 @@ class ResetRequest(BaseModel):
 app = FastAPI()
 
 
-# ✅ Exception middleware — MUST be added BEFORE CORSMiddleware
-# This ensures 500 errors still return CORS headers so the browser
+# Exception middleware — MUST be added BEFORE CORSMiddleware
+# Ensures 500 errors still return CORS headers so the browser
 # can read the actual error message instead of a generic "Network Error"
 @app.middleware("http")
 async def catch_exceptions(request: Request, call_next):
@@ -204,7 +209,11 @@ def feed(req: FeedRequest):
                     items.append(item_id)
                 if len(items) >= req.limit * 3:
                     break
-            result = [convert_path_to_url(ITEMS_META[i]) for i in items[:req.limit]]
+            result = [
+                convert_path_to_url(ITEMS_META[i])
+                for i in items[:req.limit]
+                if i in ITEMS_META
+            ]
             return {"items": result}
 
         q = u.reshape(1, -1).astype("float32")
@@ -227,7 +236,8 @@ def feed(req: FeedRequest):
             cand = [
                 (ITEM_IDS[i], sims[j], i)
                 for j, i in enumerate(idxes)
-                if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])
+                if (not req.exclude_seen or not has_seen(uid, ITEM_IDS[i]))
+                and ITEM_IDS[i] in ITEMS_META
             ]
 
             if len(cand) >= req.limit:
@@ -247,13 +257,18 @@ def feed(req: FeedRequest):
                 (ITEM_IDS[i], sims[j], i)
                 for j, i in enumerate(idxes)
                 if ITEM_IDS[i] not in liked_seen
+                and ITEM_IDS[i] in ITEMS_META
             ]
 
         # Absolute fallback: scan full catalog to guarantee a full feed
         if len(cand) < req.limit:
             already = {c[0] for c in cand}
             for i, item_id in enumerate(ITEM_IDS):
-                if item_id not in already and item_id not in USER_SEEN.get(uid, set()):
+                if (
+                    item_id not in already
+                    and item_id not in USER_SEEN.get(uid, set())
+                    and item_id in ITEMS_META
+                ):
                     sim = float(np.dot(u, ITEM_VECS[i]))
                     cand.append((item_id, sim, i))
                 if len(cand) >= req.limit * 2:
@@ -269,7 +284,11 @@ def feed(req: FeedRequest):
             len(cand)
         )
         reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
-        final_items = [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked]
+        final_items = [
+            convert_path_to_url(ITEMS_META[iid])
+            for (iid, _, _) in reranked
+            if iid in ITEMS_META
+        ]
         return {"items": final_items}
 
     except Exception as e:
@@ -294,7 +313,7 @@ def interactions(evt: Interaction):
     return {"ok": True}
 
 
-# ✅ New endpoint — resets a user's vector and seen set back to a clean state
+# Resets a user's vector and seen set back to a clean state
 @app.post("/reset")
 def reset(req: ResetRequest):
     USER_VEC.pop(req.user_id, None)
