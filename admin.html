@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      line-height: 1.4;
+    }
+
+    h1, h2 {
+      margin-bottom: 12px;
+    }
+
+    .section {
+      margin-bottom: 32px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    th, td {
+      border: 1px solid #999;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f2f2f2;
+    }
+
+    button {
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+
+    .small {
+      color: #555;
+      font-size: 14px;
+    }
+
+    .error {
+      color: red;
+      font-weight: bold;
+    }
+
+    .loading {
+      color: #333;
+    }
+
+    input {
+      padding: 6px;
+      width: 260px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Dashboard</h1>
+  <p class="small">Backend: <span id="apiBase"></span></p>
+
+  <div class="section">
+    <h2>Users</h2>
+    <button onclick="loadUsers()">Refresh Users</button>
+    <div id="usersStatus" class="loading"></div>
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>Seen Count</th>
+          <th>Has Vector</th>
+          <th>View</th>
+          <th>Preview Feed</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Popularity</h2>
+    <button onclick="loadPopularity()">Refresh Popularity</button>
+    <div id="popularityStatus" class="loading"></div>
+    <table id="popularityTable">
+      <thead>
+        <tr>
+          <th>Item ID</th>
+          <th>Likes</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>User Detail</h2>
+    <p class="small">You can click "View" in the Users table, or type a user ID manually.</p>
+    <input type="text" id="manualUserId" placeholder="Enter user ID" />
+    <button onclick="loadUserDetail(document.getElementById('manualUserId').value)">Load User</button>
+    <div id="userDetailStatus" class="loading"></div>
+
+    <h3>Summary</h3>
+    <table id="userSummaryTable">
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>Has Vector</th>
+          <th>Total Seen</th>
+          <th>Liked Count</th>
+          <th>Skipped Count</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Liked Items</h3>
+    <table id="likedTable">
+      <thead>
+        <tr>
+          <th>Item ID</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Skipped Items</h3>
+    <table id="skippedTable">
+      <thead>
+        <tr>
+          <th>Item ID</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Queue Preview</h2>
+    <p class="small">Preview the next items for a user without changing their state.</p>
+    <input type="text" id="queueUserId" placeholder="Enter user ID" />
+    <button onclick="loadQueuePreview(document.getElementById('queueUserId').value)">Preview Queue</button>
+    <div id="queueStatus" class="loading"></div>
+    <table id="queueTable">
+      <thead>
+        <tr>
+          <th>Item ID</th>
+          <th>Title</th>
+          <th>Path</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API = "https://alg-backend.onrender.com";
+    document.getElementById("apiBase").textContent = API;
+
+    function setStatus(id, message, isError = false) {
+      const el = document.getElementById(id);
+      el.textContent = message || "";
+      el.className = isError ? "error" : "loading";
+    }
+
+    function clearTableBody(tableId) {
+      document.querySelector(`#${tableId} tbody`).innerHTML = "";
+    }
+
+    function addRow(tableId, cells) {
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      const tr = document.createElement("tr");
+
+      cells.forEach(cell => {
+        const td = document.createElement("td");
+        if (cell instanceof Node) {
+          td.appendChild(cell);
+        } else {
+          td.textContent = cell ?? "";
+        }
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    }
+
+    async function loadUsers() {
+      setStatus("usersStatus", "Loading users...");
+      clearTableBody("usersTable");
+
+      try {
+        const res = await fetch(`${API}/admin/users`);
+        const data = await res.json();
+
+        const users = data.users || [];
+        if (!users.length) {
+          setStatus("usersStatus", "No users found.");
+          return;
+        }
+
+        users.forEach(user => {
+          const viewBtn = document.createElement("button");
+          viewBtn.textContent = "View";
+          viewBtn.onclick = () => loadUserDetail(user.user_id);
+
+          const previewBtn = document.createElement("button");
+          previewBtn.textContent = "Preview";
+          previewBtn.onclick = () => loadQueuePreview(user.user_id);
+
+          addRow("usersTable", [
+            user.user_id,
+            user.seen_count,
+            String(user.has_vector),
+            viewBtn,
+            previewBtn
+          ]);
+        });
+
+        setStatus("usersStatus", `Loaded ${users.length} users.`);
+      } catch (err) {
+        console.error(err);
+        setStatus("usersStatus", "Failed to load users.", true);
+      }
+    }
+
+    async function loadPopularity() {
+      setStatus("popularityStatus", "Loading popularity...");
+      clearTableBody("popularityTable");
+
+      try {
+        const res = await fetch(`${API}/admin/popularity`);
+        const data = await res.json();
+
+        const items = data.items || [];
+        if (!items.length) {
+          setStatus("popularityStatus", "No liked items found.");
+          return;
+        }
+
+        items.forEach(item => {
+          addRow("popularityTable", [item.item_id, item.likes]);
+        });
+
+        setStatus("popularityStatus", `Loaded ${items.length} popular items.`);
+      } catch (err) {
+        console.error(err);
+        setStatus("popularityStatus", "Failed to load popularity.", true);
+      }
+    }
+
+    async function loadUserDetail(userId) {
+      if (!userId) {
+        setStatus("userDetailStatus", "Please enter a user ID.", true);
+        return;
+      }
+
+      document.getElementById("manualUserId").value = userId;
+      document.getElementById("queueUserId").value = userId;
+
+      setStatus("userDetailStatus", `Loading user ${userId}...`);
+      clearTableBody("userSummaryTable");
+      clearTableBody("likedTable");
+      clearTableBody("skippedTable");
+
+      try {
+        const res = await fetch(`${API}/admin/user/${encodeURIComponent(userId)}`);
+        const data = await res.json();
+
+        addRow("userSummaryTable", [
+          data.user_id,
+          String(data.has_vector),
+          data.total_seen,
+          data.liked_count,
+          data.skipped_count
+        ]);
+
+        (data.liked || []).forEach(itemId => addRow("likedTable", [itemId]));
+        (data.skipped || []).forEach(itemId => addRow("skippedTable", [itemId]));
+
+        setStatus("userDetailStatus", `Loaded user ${userId}.`);
+      } catch (err) {
+        console.error(err);
+        setStatus("userDetailStatus", `Failed to load user ${userId}.`, true);
+      }
+    }
+
+    async function loadQueuePreview(userId) {
+      if (!userId) {
+        setStatus("queueStatus", "Please enter a user ID.", true);
+        return;
+      }
+
+      document.getElementById("queueUserId").value = userId;
+
+      setStatus("queueStatus", `Loading queue for ${userId}...`);
+      clearTableBody("queueTable");
+
+      try {
+        const res = await fetch(`${API}/admin/preview-feed/${encodeURIComponent(userId)}`, {
+          method: "POST"
+        });
+        const data = await res.json();
+
+        const items = data.items || [];
+        if (!items.length) {
+          setStatus("queueStatus", `No queue items found for ${userId}.`);
+          return;
+        }
+
+        items.forEach(item => {
+          addRow("queueTable", [
+            item.item_id || "",
+            item.title || "",
+            item.path || ""
+          ]);
+        });
+
+        setStatus("queueStatus", `Loaded ${items.length} queued items for ${userId}.`);
+      } catch (err) {
+        console.error(err);
+        setStatus("queueStatus", `Failed to load queue for ${userId}.`, true);
+      }
+    }
+
+    loadUsers();
+    loadPopularity();
+  </script>
+</body>
+</html>
