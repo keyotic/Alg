@@ -20,7 +20,6 @@ IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
 
-# Load FAISS + metadata on startup
 index = faiss.read_index(INDEX_PATH)
 with open(IDS_PATH, "r") as f:
     ITEM_IDS = json.load(f)
