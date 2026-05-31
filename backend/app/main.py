@@ -1,7 +1,9 @@
 import os, json, time
+import traceback
 import numpy as np
 import faiss
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,7 +58,27 @@ class Interaction(BaseModel):
     action: str   # "like" or "skip"
 
 
+class ResetRequest(BaseModel):
+    user_id: str
+
+
 app = FastAPI()
+
+
+# ✅ Exception middleware — MUST be added BEFORE CORSMiddleware
+# This ensures 500 errors still return CORS headers so the browser
+# can read the actual error message instead of a generic "Network Error"
+@app.middleware("http")
+async def catch_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        traceback.print_exc()  # prints full error to Render logs
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e)},
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
 
 
 # Add CORS middleware
@@ -169,85 +191,90 @@ def convert_path_to_url(item):
 
 @app.post("/feed")
 def feed(req: FeedRequest):
-    uid = req.user_id
-    u = get_user_vec(uid)
-    k_candidates = max(req.limit * 5, 100)
+    try:
+        uid = req.user_id
+        u = get_user_vec(uid)
+        k_candidates = max(req.limit * 5, 100)
 
-    if u is None:
-        # Larger initial buffer so early skips don't exhaust the seen set
-        items = []
-        for item_id in ITEM_IDS:
-            if not req.exclude_seen or not has_seen(uid, item_id):
-                items.append(item_id)
-            if len(items) >= req.limit * 3:
-                break
-        result = [convert_path_to_url(ITEMS_META[i]) for i in items[:req.limit]]
-        return {"items": result}
+        if u is None:
+            # Larger initial buffer so early skips don't exhaust the seen set
+            items = []
+            for item_id in ITEM_IDS:
+                if not req.exclude_seen or not has_seen(uid, item_id):
+                    items.append(item_id)
+                if len(items) >= req.limit * 3:
+                    break
+            result = [convert_path_to_url(ITEMS_META[i]) for i in items[:req.limit]]
+            return {"items": result}
 
-    q = u.reshape(1, -1).astype("float32")
+        q = u.reshape(1, -1).astype("float32")
 
-    # Try progressively wider searches
-    attempts = [
-        k_candidates,       # 100 items
-        k_candidates * 3,   # 300 items
-        k_candidates * 10,  # 1000 items
-        len(ITEM_IDS)       # All items
-    ]
-
-    cand = []
-
-    for attempt_k in attempts:
-        attempt_k = min(attempt_k, len(ITEM_IDS))
-        sims, idxes = index.search(q, attempt_k)
-        idxes, sims = idxes[0], sims[0]
-
-        cand = [
-            (ITEM_IDS[i], sims[j], i)
-            for j, i in enumerate(idxes)
-            if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])
+        # Try progressively wider searches
+        attempts = [
+            k_candidates,       # 100 items
+            k_candidates * 3,   # 300 items
+            k_candidates * 10,  # 1000 items
+            len(ITEM_IDS)       # All items
         ]
 
-        if len(cand) >= req.limit:
-            break
+        cand = []
 
-    # Smart reset: preserve liked items, clear skipped items from seen set
-    if len(cand) < req.limit:
-        liked_seen = {
-            iid for iid in USER_SEEN.get(uid, set())
-            if POPULARITY.get(iid, 0.0) > 0
-        }
-        USER_SEEN[uid] = liked_seen
+        for attempt_k in attempts:
+            attempt_k = min(attempt_k, len(ITEM_IDS))
+            sims, idxes = index.search(q, attempt_k)
+            idxes, sims = idxes[0], sims[0]
 
-        sims, idxes = index.search(q, k_candidates)
-        idxes, sims = idxes[0], sims[0]
-        cand = [
-            (ITEM_IDS[i], sims[j], i)
-            for j, i in enumerate(idxes)
-            if ITEM_IDS[i] not in liked_seen
-        ]
+            cand = [
+                (ITEM_IDS[i], sims[j], i)
+                for j, i in enumerate(idxes)
+                if not req.exclude_seen or not has_seen(uid, ITEM_IDS[i])
+            ]
 
-    # Absolute fallback: scan full catalog to guarantee a full feed
-    if len(cand) < req.limit:
-        already = {c[0] for c in cand}
-        for i, item_id in enumerate(ITEM_IDS):
-            if item_id not in already and item_id not in USER_SEEN.get(uid, set()):
-                sim = float(np.dot(u, ITEM_VECS[i]))
-                cand.append((item_id, sim, i))
-            if len(cand) >= req.limit * 2:
+            if len(cand) >= req.limit:
                 break
 
-    if not cand:
-        return {"items": []}
+        # Smart reset: preserve liked items, clear skipped items from seen set
+        if len(cand) < req.limit:
+            liked_seen = {
+                iid for iid in USER_SEEN.get(uid, set())
+                if POPULARITY.get(iid, 0.0) > 0
+            }
+            USER_SEEN[uid] = liked_seen
 
-    scored = score_items(
-        u,
-        np.array([c[2] for c in cand]),
-        np.array([c[1] for c in cand]),
-        len(cand)
-    )
-    reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
-    final_items = [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked]
-    return {"items": final_items}
+            sims, idxes = index.search(q, k_candidates)
+            idxes, sims = idxes[0], sims[0]
+            cand = [
+                (ITEM_IDS[i], sims[j], i)
+                for j, i in enumerate(idxes)
+                if ITEM_IDS[i] not in liked_seen
+            ]
+
+        # Absolute fallback: scan full catalog to guarantee a full feed
+        if len(cand) < req.limit:
+            already = {c[0] for c in cand}
+            for i, item_id in enumerate(ITEM_IDS):
+                if item_id not in already and item_id not in USER_SEEN.get(uid, set()):
+                    sim = float(np.dot(u, ITEM_VECS[i]))
+                    cand.append((item_id, sim, i))
+                if len(cand) >= req.limit * 2:
+                    break
+
+        if not cand:
+            return {"items": []}
+
+        scored = score_items(
+            u,
+            np.array([c[2] for c in cand]),
+            np.array([c[1] for c in cand]),
+            len(cand)
+        )
+        reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
+        final_items = [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked]
+        return {"items": final_items}
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/interactions")
@@ -264,4 +291,12 @@ def interactions(evt: Interaction):
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
+    return {"ok": True}
+
+
+# ✅ New endpoint — resets a user's vector and seen set back to a clean state
+@app.post("/reset")
+def reset(req: ResetRequest):
+    USER_VEC.pop(req.user_id, None)
+    USER_SEEN.pop(req.user_id, None)
     return {"ok": True}
