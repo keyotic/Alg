@@ -245,3 +245,30 @@ button:focus-visible {
   background-color: transparent;
   border: none;
 }
+
+.exitfinal {
+  display: flex;
+  justify-content: end;
+  background-color: #f9f9f900;
+  border: none;
+}
+
+.exitheader{
+  display: flex;
+  justify-content: end;
+  background-color: transparent;
+  margin-top: -93em;
+  margin-left: 60em;
+}
+
+.predictiontext{
+ margin-top: 800px;
+ margin-left: -23em;
+ width: 800px;
+ height: 180px;
+ font-size : 30pt;
+ font-weight: bold;
+ font-family: mr-eaves-xl-modern, sans-serif;
+ color : #FFF;
+ text-align: center;
+}
