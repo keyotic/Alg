@@ -1,4 +1,4 @@
-import os, json, time, random
+import os, json, time
 import traceback
 import numpy as np
 import faiss
@@ -277,11 +277,6 @@ def get_fortune_state(uid: str):
         }
 
 
-def generate_personalized_fortune(uid: str):
-    state = get_fortune_state(uid)
-    return random.choice(state["pool"])
-
-
 def get_preview_fortune(uid: str):
     state = get_fortune_state(uid)
     pool = state["pool"]
@@ -292,6 +287,10 @@ def get_preview_fortune(uid: str):
 
     idx = min(total, len(pool) - 1)
     return pool[idx]
+
+
+def generate_personalized_fortune(uid: str):
+    return get_preview_fortune(uid)
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -495,11 +494,17 @@ def interactions(evt: Interaction):
 def get_fortune(user_id: str):
     history = USER_HISTORY.get(user_id, [])
     state = get_fortune_state(user_id)
+    preview = get_preview_fortune(user_id)
     return {
         "user_id": user_id,
         "history_count": len(history),
         "segment": state["segment"],
-        "fortune": generate_personalized_fortune(user_id),
+        "fortune": preview,
+        "fortune_preview": preview,
+        "fortune_pool_size": len(state["pool"]),
+        "fortune_total_interactions": state["total"],
+        "fortune_like_ratio": state["like_ratio"],
+        "fortune_skip_ratio": state["skip_ratio"],
     }
 
 
