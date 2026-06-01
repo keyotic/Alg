@@ -4,17 +4,126 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/Alg/assets/index.css" />
-    <link rel="stylesheet" href="../src/index.css" /> 
+    <link rel="stylesheet" href="../src/index.css" />
     <link rel="stylesheet" href="https://use.typekit.net/jha8zkp.css">
     <title>Document</title>
 </head>
 <body>
     <header class="exitheader">
-        <button class="exitfinal" onclick="window.location.href='Home.html'"><img src="assets/img/ExitAlg.svg" alt="Exit"> </button>
-    </header>    
+        <button class="exitfinal" onclick="goHome()">
+            <img src="assets/img/ExitAlg.svg" alt="Exit">
+        </button>
+    </header>
+
     <div class="intro">
-    <p class="predictiontext">prediction</p>
+        <p class="predictiontext" id="predictionText">prediction</p>
     </div>
-    
+
+    <script>
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let hasStarted = false;
+        let speechStopped = false;
+
+        function loadVoices() {
+            voices = synth.getVoices();
+        }
+
+        function getPreferredVoice() {
+            if (!voices.length) return null;
+
+            return (
+                voices.find(v => v.name === "Google UK English Female") ||
+                voices.find(v => v.name === "Microsoft Sonia Online (Natural) - English (United Kingdom)") ||
+                voices.find(v => v.name === "Samantha") ||
+                voices.find(v => v.name === "Karen") ||
+                voices.find(v => v.name.toLowerCase().includes("female") && v.lang.startsWith("en")) ||
+                voices.find(v => v.lang === "en-GB") ||
+                voices.find(v => v.lang === "en-US") ||
+                voices[0]
+            );
+        }
+
+        function stopSpeaking() {
+            speechStopped = true;
+            if ("speechSynthesis" in window) {
+                synth.cancel();
+            }
+        }
+
+        function speakLines(lines, index = 0) {
+            if (speechStopped) return;
+            if (index >= lines.length) return;
+
+            const utterance = new SpeechSynthesisUtterance(lines[index]);
+            const selectedVoice = getPreferredVoice();
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+                utterance.lang = selectedVoice.lang;
+            } else {
+                utterance.lang = "en-GB";
+            }
+
+            utterance.rate = 0.78;
+            utterance.pitch = 0.82;
+            utterance.volume = 1;
+
+            utterance.onend = () => {
+                if (speechStopped) return;
+                setTimeout(() => speakLines(lines, index + 1), 350);
+            };
+
+            synth.speak(utterance);
+        }
+
+        function speakPrediction() {
+            if (!("speechSynthesis" in window)) return;
+            if (speechStopped) return;
+
+            synth.cancel();
+
+            const predictionText = document.getElementById("predictionText").textContent.trim();
+
+            const lines = [
+                "The vision is clear...",
+                predictionText
+            ];
+
+            speakLines(lines);
+        }
+
+        function goHome() {
+            stopSpeaking();
+            window.location.href = "Home.html";
+        }
+
+        if ("speechSynthesis" in window) {
+            loadVoices();
+
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = loadVoices;
+            }
+
+            window.addEventListener("load", () => {
+                if (hasStarted) return;
+                hasStarted = true;
+
+                setTimeout(() => {
+                    if (!speechStopped) {
+                        speakPrediction();
+                    }
+                }, 900);
+            });
+
+            window.addEventListener("beforeunload", () => {
+                stopSpeaking();
+            });
+
+            window.addEventListener("pagehide", () => {
+                stopSpeaking();
+            });
+        }
+    </script>
 </body>
-</html>     
+</html>
