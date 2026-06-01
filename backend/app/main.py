@@ -336,26 +336,68 @@ def admin_users():
                 "user_id": uid,
                 "seen_count": len(USER_SEEN.get(uid, set())),
                 "has_vector": uid in USER_VEC,
+                "history_count": len(USER_HISTORY.get(uid, [])),
+                "is_active": uid == LAST_ACTIVE_USER,
             }
-            for uid in sorted(set(list(USER_VEC.keys()) + list(USER_SEEN.keys())))
+            for uid in sorted(set(
+                list(USER_VEC.keys()) +
+                list(USER_SEEN.keys()) +
+                list(USER_HISTORY.keys())
+            ))
         ]
     }
 
 
 @app.get("/admin/user/{user_id}")
 def admin_user_detail(user_id: str):
-    seen = USER_SEEN.get(user_id, set())
-    liked = [iid for iid in seen if POPULARITY.get(iid, 0.0) > 0]
-    skipped = [iid for iid in seen if POPULARITY.get(iid, 0.0) == 0]
+    history = USER_HISTORY.get(user_id, [])
+    liked = [h["item_id"] for h in history if h["action"] == "like"]
+    skipped = [h["item_id"] for h in history if h["action"] == "skip"]
 
     return {
         "user_id": user_id,
         "has_vector": user_id in USER_VEC,
-        "total_seen": len(seen),
-        "liked": sorted(liked),
-        "skipped": sorted(skipped),
+        "total_seen": len(USER_SEEN.get(user_id, set())),
+        "liked": liked,
+        "skipped": skipped,
         "liked_count": len(liked),
         "skipped_count": len(skipped),
+        "history": history,
+        "is_active": user_id == LAST_ACTIVE_USER,
+        "last_activity_at": LAST_ACTIVITY_AT if user_id == LAST_ACTIVE_USER else None,
+    }
+
+
+@app.get("/admin/current-user")
+def admin_current_user():
+    if not LAST_ACTIVE_USER:
+        return {
+            "active_user": None,
+            "has_vector": False,
+            "total_seen": 0,
+            "liked": [],
+            "skipped": [],
+            "liked_count": 0,
+            "skipped_count": 0,
+            "history": [],
+            "last_activity_at": None,
+        }
+
+    uid = LAST_ACTIVE_USER
+    history = USER_HISTORY.get(uid, [])
+    liked = [h["item_id"] for h in history if h["action"] == "like"]
+    skipped = [h["item_id"] for h in history if h["action"] == "skip"]
+
+    return {
+        "active_user": uid,
+        "has_vector": uid in USER_VEC,
+        "total_seen": len(USER_SEEN.get(uid, set())),
+        "liked": liked,
+        "skipped": skipped,
+        "liked_count": len(liked),
+        "skipped_count": len(skipped),
+        "history": history,
+        "last_activity_at": LAST_ACTIVITY_AT,
     }
 
 
@@ -373,4 +415,5 @@ def admin_popularity():
 
 @app.post("/admin/preview-feed/{user_id}")
 def admin_preview_feed(user_id: str, limit: int = 15):
+    mark_active(user_id)
     return feed(FeedRequest(user_id=user_id, limit=limit, exclude_seen=True))
