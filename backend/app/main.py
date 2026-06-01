@@ -142,7 +142,7 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
-def generate_personalized_fortune(uid: str):
+def get_fortune_state(uid: str):
     history = USER_HISTORY.get(uid, [])
     likes = [h for h in history if h["action"] == "like"]
     skips = [h for h in history if h["action"] == "skip"]
@@ -151,85 +151,147 @@ def generate_personalized_fortune(uid: str):
     skip_count = len(skips)
     total = like_count + skip_count
 
-    if total == 1:
-        pool = [
-            "Your future is still unwritten, but possibility already surrounds you.",
-            "The path ahead is quiet now, yet something meaningful is beginning.",
-            "A hidden opportunity is waiting for you to make the first move.",
-            "The first sign is subtle, but it will lead you somewhere worth finding.",
-            "What feels distant now will soon step closer than expected.",
-            "A quiet beginning is preparing a louder destiny.",
-            "Something small is already shifting in your favor.",
-            "The answer has not appeared yet, but the pattern has already begun.",
-            "A new path opens the moment you decide to notice it."
-        ]
-        return random.choice(pool)
+    if total <= 1:
+        return {
+            "segment": "early-stage",
+            "like_count": like_count,
+            "skip_count": skip_count,
+            "total": total,
+            "like_ratio": 0.0 if total == 0 else like_count / total,
+            "skip_ratio": 0.0 if total == 0 else skip_count / total,
+            "pool": [
+                "Your future is still unwritten, but possibility already surrounds you.",
+                "The path ahead is quiet now, yet something meaningful is beginning.",
+                "A hidden opportunity is waiting for you to make the first move.",
+                "The first sign is subtle, but it will lead you somewhere worth finding.",
+                "What feels distant now will soon step closer than expected.",
+                "A quiet beginning is preparing a louder destiny.",
+                "Something small is already shifting in your favor.",
+                "The answer has not appeared yet, but the pattern has already begun.",
+                "A new path opens the moment you decide to notice it."
+            ]
+        }
 
     like_ratio = like_count / total
     skip_ratio = skip_count / total
 
     if like_count >= 12 and like_ratio >= 0.7:
-        pool = [
-            "You move toward life with confidence. A bold opportunity will soon reward your instincts.",
-            "You know what draws you in, and that certainty will open an unexpected door.",
-            "Your future favors decisive energy. What you choose next may change more than you expect.",
-            "You follow desire without apology, and fortune responds to that courage.",
-            "The things you choose boldly now will echo back as luck later.",
-            "A risk you are ready for will soon reveal itself.",
-            "Your confidence is becoming a magnet for rare opportunities.",
-            "You are not waiting for the future. You are pulling it toward you.",
-            "A moment of fearless choice will set something powerful into motion."
-        ]
+        return {
+            "segment": "bold-liker",
+            "like_count": like_count,
+            "skip_count": skip_count,
+            "total": total,
+            "like_ratio": like_ratio,
+            "skip_ratio": skip_ratio,
+            "pool": [
+                "You move toward life with confidence. A bold opportunity will soon reward your instincts.",
+                "You know what draws you in, and that certainty will open an unexpected door.",
+                "Your future favors decisive energy. What you choose next may change more than you expect.",
+                "You follow desire without apology, and fortune responds to that courage.",
+                "The things you choose boldly now will echo back as luck later.",
+                "A risk you are ready for will soon reveal itself.",
+                "Your confidence is becoming a magnet for rare opportunities.",
+                "You are not waiting for the future. You are pulling it toward you.",
+                "A moment of fearless choice will set something powerful into motion."
+            ]
+        }
     elif skip_count >= 12 and skip_ratio >= 0.7:
-        pool = [
-            "You are guided by discernment, not distraction. A clearer path is forming ahead of you.",
-            "You know how to reject what is not meant for you. That wisdom will protect your future.",
-            "Your restraint is a strength. By turning away from the wrong things, you are making space for the right one.",
-            "Your future sharpens each time you refuse what does not fit.",
-            "Clarity is becoming your greatest advantage.",
-            "You are cutting through illusion, and that will soon reveal something real.",
-            "Your ability to say no is quietly shaping a more honest destiny.",
-            "You are not missing out. You are refining what truly belongs to you.",
-            "By filtering the noise, you are making room for something rare."
-        ]
+        return {
+            "segment": "high-discernment-skipper",
+            "like_count": like_count,
+            "skip_count": skip_count,
+            "total": total,
+            "like_ratio": like_ratio,
+            "skip_ratio": skip_ratio,
+            "pool": [
+                "You are guided by discernment, not distraction. A clearer path is forming ahead of you.",
+                "You know how to reject what is not meant for you. That wisdom will protect your future.",
+                "Your restraint is a strength. By turning away from the wrong things, you are making space for the right one.",
+                "Your future sharpens each time you refuse what does not fit.",
+                "Clarity is becoming your greatest advantage.",
+                "You are cutting through illusion, and that will soon reveal something real.",
+                "Your ability to say no is quietly shaping a more honest destiny.",
+                "You are not missing out. You are refining what truly belongs to you.",
+                "By filtering the noise, you are making room for something rare."
+            ]
+        }
     elif like_count > skip_count:
-        pool = [
-            "You follow curiosity with an open heart. Soon, something new will feel instantly familiar.",
-            "You are drawn to possibility, and that openness will bring a fortunate surprise.",
-            "Your future carries momentum. What excites you now is pointing toward what comes next.",
-            "You are expanding faster than you realize, and the world is beginning to answer.",
-            "An unexpected invitation will match the energy you have been moving toward.",
-            "Your openness will lead you somewhere richer than your original plan.",
-            "What delights you now is more than a preference. It is a direction.",
-            "You are gathering signals from the future through what attracts you today.",
-            "A joyful instinct will soon prove wiser than logic alone."
-        ]
+        return {
+            "segment": "curious-openness",
+            "like_count": like_count,
+            "skip_count": skip_count,
+            "total": total,
+            "like_ratio": like_ratio,
+            "skip_ratio": skip_ratio,
+            "pool": [
+                "You follow curiosity with an open heart. Soon, something new will feel instantly familiar.",
+                "You are drawn to possibility, and that openness will bring a fortunate surprise.",
+                "Your future carries momentum. What excites you now is pointing toward what comes next.",
+                "You are expanding faster than you realize, and the world is beginning to answer.",
+                "An unexpected invitation will match the energy you have been moving toward.",
+                "Your openness will lead you somewhere richer than your original plan.",
+                "What delights you now is more than a preference. It is a direction.",
+                "You are gathering signals from the future through what attracts you today.",
+                "A joyful instinct will soon prove wiser than logic alone."
+            ]
+        }
     elif skip_count > like_count:
-        pool = [
-            "You trust your inner filter, and it is sharpening your destiny.",
-            "You are narrowing the noise around you. What remains will matter deeply.",
-            "Your future grows clearer with every choice you refuse.",
-            "You are learning through elimination, and that knowledge is powerful.",
-            "What you reject now is protecting the shape of what comes next.",
-            "The path ahead is becoming visible because you are no longer chasing everything.",
-            "There is power in your refusal, and it will soon reveal purpose.",
-            "By stepping away from the wrong things, you are drawing closer to the right one.",
-            "Your patience with imperfection will soon be rewarded by something unmistakable."
-        ]
+        return {
+            "segment": "refining-path",
+            "like_count": like_count,
+            "skip_count": skip_count,
+            "total": total,
+            "like_ratio": like_ratio,
+            "skip_ratio": skip_ratio,
+            "pool": [
+                "You trust your inner filter, and it is sharpening your destiny.",
+                "You are narrowing the noise around you. What remains will matter deeply.",
+                "Your future grows clearer with every choice you refuse.",
+                "You are learning through elimination, and that knowledge is powerful.",
+                "What you reject now is protecting the shape of what comes next.",
+                "The path ahead is becoming visible because you are no longer chasing everything.",
+                "There is power in your refusal, and it will soon reveal purpose.",
+                "By stepping away from the wrong things, you are drawing closer to the right one.",
+                "Your patience with imperfection will soon be rewarded by something unmistakable."
+            ]
+        }
     else:
-        pool = [
-            "You balance instinct and caution with rare precision. A meaningful choice is approaching.",
-            "You move carefully, but not fearfully. That balance will serve you well.",
-            "You are learning not only what you want, but why. That knowledge will shape your next chapter.",
-            "You stand between desire and discernment, and that is where wisdom grows.",
-            "A balanced heart often sees what others miss.",
-            "You are not divided. You are measuring the world with care.",
-            "Because you weigh both impulse and restraint, your next step will carry unusual strength.",
-            "Your future is being built on thoughtful tension, and that makes it resilient.",
-            "The harmony between your curiosity and caution will soon reveal a powerful answer."
-        ]
+        return {
+            "segment": "balanced-thinker",
+            "like_count": like_count,
+            "skip_count": skip_count,
+            "total": total,
+            "like_ratio": like_ratio,
+            "skip_ratio": skip_ratio,
+            "pool": [
+                "You balance instinct and caution with rare precision. A meaningful choice is approaching.",
+                "You move carefully, but not fearfully. That balance will serve you well.",
+                "You are learning not only what you want, but why. That knowledge will shape your next chapter.",
+                "You stand between desire and discernment, and that is where wisdom grows.",
+                "A balanced heart often sees what others miss.",
+                "You are not divided. You are measuring the world with care.",
+                "Because you weigh both impulse and restraint, your next step will carry unusual strength.",
+                "Your future is being built on thoughtful tension, and that makes it resilient.",
+                "The harmony between your curiosity and caution will soon reveal a powerful answer."
+            ]
+        }
 
-    return random.choice(pool)
+
+def generate_personalized_fortune(uid: str):
+    state = get_fortune_state(uid)
+    return random.choice(state["pool"])
+
+
+def get_preview_fortune(uid: str):
+    state = get_fortune_state(uid)
+    pool = state["pool"]
+    total = state["total"]
+
+    if not pool:
+        return None
+
+    idx = min(total, len(pool) - 1)
+    return pool[idx]
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -252,7 +314,6 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
     alpha, beta, gamma = 0.85, 0.10, 0.05
     scored = []
     for row_idx, sim in zip(idxes, sims):
-        # Guard: skip FAISS rows that fall outside ITEM_IDS bounds
         if row_idx < 0 or row_idx >= len(ITEM_IDS):
             continue
         item_id = ITEM_IDS[row_idx]
@@ -302,7 +363,6 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
 
 
 def convert_path_to_url(item):
-    """Convert local file path to HTTP URL for frontend"""
     result = item.copy()
     if result["path"].startswith("data/"):
         filename = result["path"].split("/")[-1]
@@ -321,7 +381,6 @@ def feed(req: FeedRequest):
         k_candidates = max(req.limit * 5, 100)
 
         if u is None:
-            # Larger initial buffer so early skips don't exhaust the seen set
             items = []
             for item_id in ITEM_IDS:
                 if item_id not in ITEMS_META:
@@ -335,12 +394,11 @@ def feed(req: FeedRequest):
 
         q = u.reshape(1, -1).astype("float32")
 
-        # Try progressively wider searches
         attempts = [
-            k_candidates,       # 100 items
-            k_candidates * 3,   # 300 items
-            k_candidates * 10,  # 1000 items
-            len(ITEM_IDS)       # All items
+            k_candidates,
+            k_candidates * 3,
+            k_candidates * 10,
+            len(ITEM_IDS)
         ]
 
         cand = []
@@ -361,7 +419,6 @@ def feed(req: FeedRequest):
             if len(cand) >= req.limit:
                 break
 
-        # Smart reset: preserve liked items, clear skipped items from seen set
         if len(cand) < req.limit:
             liked_seen = {
                 iid for iid in USER_SEEN.get(uid, set())
@@ -379,7 +436,6 @@ def feed(req: FeedRequest):
                 and ITEM_IDS[i] not in liked_seen
             ]
 
-        # Absolute fallback: scan full catalog to guarantee a full feed
         if len(cand) < req.limit:
             already = {c[0] for c in cand}
             for i, item_id in enumerate(ITEM_IDS):
@@ -438,14 +494,15 @@ def interactions(evt: Interaction):
 @app.get("/fortune/{user_id}")
 def get_fortune(user_id: str):
     history = USER_HISTORY.get(user_id, [])
+    state = get_fortune_state(user_id)
     return {
         "user_id": user_id,
         "history_count": len(history),
+        "segment": state["segment"],
         "fortune": generate_personalized_fortune(user_id),
     }
 
 
-# Resets a user's vector, seen set, history, and active state back to a clean state
 @app.post("/reset")
 def reset(req: ResetRequest):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
@@ -460,8 +517,6 @@ def reset(req: ResetRequest):
 
     return {"ok": True}
 
-
-# ── Admin / Debug endpoints ────────────────────────────────────────────────
 
 @app.get("/admin/users")
 def admin_users():
@@ -488,6 +543,7 @@ def admin_user_detail(user_id: str):
     history = USER_HISTORY.get(user_id, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
+    state = get_fortune_state(user_id)
 
     return {
         "user_id": user_id,
@@ -500,6 +556,12 @@ def admin_user_detail(user_id: str):
         "history": history,
         "is_active": user_id == LAST_ACTIVE_USER,
         "last_activity_at": LAST_ACTIVITY_AT if user_id == LAST_ACTIVE_USER else None,
+        "fortune_segment": state["segment"],
+        "fortune_preview": get_preview_fortune(user_id),
+        "fortune_pool_size": len(state["pool"]),
+        "fortune_total_interactions": state["total"],
+        "fortune_like_ratio": state["like_ratio"],
+        "fortune_skip_ratio": state["skip_ratio"],
     }
 
 
@@ -516,12 +578,19 @@ def admin_current_user():
             "skipped_count": 0,
             "history": [],
             "last_activity_at": None,
+            "fortune_segment": None,
+            "fortune_preview": None,
+            "fortune_pool_size": 0,
+            "fortune_total_interactions": 0,
+            "fortune_like_ratio": 0.0,
+            "fortune_skip_ratio": 0.0,
         }
 
     uid = LAST_ACTIVE_USER
     history = USER_HISTORY.get(uid, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
+    state = get_fortune_state(uid)
 
     return {
         "active_user": uid,
@@ -533,6 +602,12 @@ def admin_current_user():
         "skipped_count": len(skipped),
         "history": history,
         "last_activity_at": LAST_ACTIVITY_AT,
+        "fortune_segment": state["segment"],
+        "fortune_preview": get_preview_fortune(uid),
+        "fortune_pool_size": len(state["pool"]),
+        "fortune_total_interactions": state["total"],
+        "fortune_like_ratio": state["like_ratio"],
+        "fortune_skip_ratio": state["skip_ratio"],
     }
 
 

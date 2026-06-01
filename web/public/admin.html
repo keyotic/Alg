@@ -190,6 +190,64 @@
       font-weight: bold;
     }
 
+    .fortune-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .fortune-box,
+    .fortune-meta {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #fbfcff;
+      padding: 16px;
+    }
+
+    .fortune-box blockquote {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.5;
+      color: var(--text);
+      font-style: italic;
+    }
+
+    .fortune-box .fortune-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .fortune-meta-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .fortune-meta-item {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      padding: 12px;
+    }
+
+    .fortune-meta-item .label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .fortune-meta-item .value {
+      font-size: 16px;
+      font-weight: bold;
+      word-break: break-word;
+    }
+
     table {
       border-collapse: collapse;
       width: 100%;
@@ -253,6 +311,10 @@
       .summary {
         grid-template-columns: repeat(2, minmax(140px, 1fr));
       }
+
+      .fortune-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 560px) {
@@ -272,6 +334,10 @@
       th, td {
         font-size: 13px;
         padding: 9px 10px;
+      }
+
+      .fortune-box blockquote {
+        font-size: 17px;
       }
     }
   </style>
@@ -320,6 +386,43 @@
         <div class="summary-card">
           <div class="label">Last activity</div>
           <div class="value" id="summaryActivity" style="font-size: 15px;">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Fortune Preview</h2>
+      <p class="muted">This shows one stable fortune preview for the active user based on the current rule bucket and interaction mix.</p>
+
+      <div class="fortune-grid">
+        <div class="fortune-box">
+          <div class="fortune-label">Current possible fortune</div>
+          <blockquote id="fortunePreviewText">No active user right now.</blockquote>
+        </div>
+
+        <div class="fortune-meta">
+          <div class="fortune-meta-list">
+            <div class="fortune-meta-item">
+              <div class="label">Segment</div>
+              <div class="value" id="fortuneSegment">—</div>
+            </div>
+            <div class="fortune-meta-item">
+              <div class="label">Pool size</div>
+              <div class="value" id="fortunePoolSize">0</div>
+            </div>
+            <div class="fortune-meta-item">
+              <div class="label">Total interactions</div>
+              <div class="value" id="fortuneTotalInteractions">0</div>
+            </div>
+            <div class="fortune-meta-item">
+              <div class="label">Like ratio</div>
+              <div class="value" id="fortuneLikeRatio">0%</div>
+            </div>
+            <div class="fortune-meta-item">
+              <div class="label">Skip ratio</div>
+              <div class="value" id="fortuneSkipRatio">0%</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -451,6 +554,11 @@
       document.getElementById(id).style.display = visible ? "block" : "none";
     }
 
+    function formatPercent(value) {
+      if (typeof value !== "number" || Number.isNaN(value)) return "0%";
+      return `${Math.round(value * 100)}%`;
+    }
+
     function setSummary(data) {
       document.getElementById("summaryUser").textContent = data?.active_user || "—";
       document.getElementById("summaryVector").textContent =
@@ -470,6 +578,42 @@
         liked_count: 0,
         skipped_count: 0,
         last_activity_at: null
+      });
+    }
+
+    function setFortunePreview(data) {
+      const hasUser = Boolean(data?.active_user);
+
+      document.getElementById("fortunePreviewText").textContent =
+        hasUser
+          ? (data?.fortune_preview || "No preview fortune available.")
+          : "No active user right now.";
+
+      document.getElementById("fortuneSegment").textContent =
+        hasUser ? (data?.fortune_segment || "—") : "—";
+
+      document.getElementById("fortunePoolSize").textContent =
+        hasUser ? String(data?.fortune_pool_size ?? 0) : "0";
+
+      document.getElementById("fortuneTotalInteractions").textContent =
+        hasUser ? String(data?.fortune_total_interactions ?? 0) : "0";
+
+      document.getElementById("fortuneLikeRatio").textContent =
+        hasUser ? formatPercent(data?.fortune_like_ratio ?? 0) : "0%";
+
+      document.getElementById("fortuneSkipRatio").textContent =
+        hasUser ? formatPercent(data?.fortune_skip_ratio ?? 0) : "0%";
+    }
+
+    function resetFortunePreview() {
+      setFortunePreview({
+        active_user: null,
+        fortune_preview: null,
+        fortune_segment: null,
+        fortune_pool_size: 0,
+        fortune_total_interactions: 0,
+        fortune_like_ratio: 0,
+        fortune_skip_ratio: 0
       });
     }
 
@@ -522,6 +666,7 @@
 
       if (!data.active_user) {
         resetSummary();
+        resetFortunePreview();
         setEmptyState("currentUserEmpty", true);
         setEmptyState("likedEmpty", true);
         setEmptyState("skippedEmpty", true);
@@ -531,6 +676,7 @@
       }
 
       setSummary(data);
+      setFortunePreview(data);
 
       addRow("currentUserTable", [
         data.active_user,
@@ -587,6 +733,7 @@
         console.error(err);
         clearAllTables();
         resetSummary();
+        resetFortunePreview();
         setEmptyState("currentUserEmpty", true);
         setEmptyState("likedEmpty", true);
         setEmptyState("skippedEmpty", true);
