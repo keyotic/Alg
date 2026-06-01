@@ -27,6 +27,7 @@
         const synth = window.speechSynthesis;
         let voices = [];
         let hasStarted = false;
+        let speechStopped = false;
 
         function loadVoices() {
             voices = synth.getVoices();
@@ -47,7 +48,15 @@
             );
         }
 
+        function stopSpeaking() {
+            speechStopped = true;
+            if ("speechSynthesis" in window) {
+                synth.cancel();
+            }
+        }
+
         function speakLines(lines, index = 0) {
+            if (speechStopped) return;
             if (index >= lines.length) return;
 
             const text = lines[index];
@@ -66,6 +75,7 @@
             utterance.volume = 1;
 
             utterance.onend = () => {
+                if (speechStopped) return;
                 setTimeout(() => speakLines(lines, index + 1), 350);
             };
 
@@ -74,6 +84,7 @@
 
         function speakIntro() {
             if (!("speechSynthesis" in window)) return;
+            if (speechStopped) return;
 
             synth.cancel();
 
@@ -90,9 +101,7 @@
         }
 
         function goNextPage() {
-            if ("speechSynthesis" in window) {
-                synth.cancel();
-            }
+            stopSpeaking();
             window.location.href = "name1.html";
         }
 
@@ -108,12 +117,18 @@
                 hasStarted = true;
 
                 setTimeout(() => {
-                    speakIntro();
+                    if (!speechStopped) {
+                        speakIntro();
+                    }
                 }, 900);
             });
 
             window.addEventListener("beforeunload", () => {
-                synth.cancel();
+                stopSpeaking();
+            });
+
+            window.addEventListener("pagehide", () => {
+                stopSpeaking();
             });
         }
     </script>
