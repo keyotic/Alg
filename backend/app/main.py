@@ -1,4 +1,4 @@
-import os, json, time
+import os, json, time, random
 import traceback
 import numpy as np
 import faiss
@@ -140,6 +140,60 @@ def log_interaction(uid: str, item_id: str, action: str):
         "action": action,
         "ts": time.time(),
     })
+
+
+def generate_personalized_fortune(uid: str):
+    history = USER_HISTORY.get(uid, [])
+    likes = [h for h in history if h["action"] == "like"]
+    skips = [h for h in history if h["action"] == "skip"]
+
+    like_count = len(likes)
+    skip_count = len(skips)
+    total = like_count + skip_count
+
+    if total == 0:
+        pool = [
+            "Your future is still unwritten, but possibility already surrounds you.",
+            "The path ahead is quiet now, yet something meaningful is beginning.",
+            "A hidden opportunity is waiting for you to make the first move."
+        ]
+        return random.choice(pool)
+
+    like_ratio = like_count / total
+    skip_ratio = skip_count / total
+
+    if like_count >= 12 and like_ratio >= 0.7:
+        pool = [
+            "You move toward life with confidence. A bold opportunity will soon reward your instincts.",
+            "You know what draws you in, and that certainty will open an unexpected door.",
+            "Your future favors decisive energy. What you choose next may change more than you expect."
+        ]
+    elif skip_count >= 12 and skip_ratio >= 0.7:
+        pool = [
+            "You are guided by discernment, not distraction. A clearer path is forming ahead of you.",
+            "You know how to reject what is not meant for you. That wisdom will protect your future.",
+            "Your restraint is a strength. By turning away from the wrong things, you are making space for the right one."
+        ]
+    elif like_count > skip_count:
+        pool = [
+            "You follow curiosity with an open heart. Soon, something new will feel instantly familiar.",
+            "You are drawn to possibility, and that openness will bring a fortunate surprise.",
+            "Your future carries momentum. What excites you now is pointing toward what comes next."
+        ]
+    elif skip_count > like_count:
+        pool = [
+            "You trust your inner filter, and it is sharpening your destiny.",
+            "You are narrowing the noise around you. What remains will matter deeply.",
+            "Your future grows clearer with every choice you refuse."
+        ]
+    else:
+        pool = [
+            "You balance instinct and caution with rare precision. A meaningful choice is approaching.",
+            "You move carefully, but not fearfully. That balance will serve you well.",
+            "You are learning not only what you want, but why. That knowledge will shape your next chapter."
+        ]
+
+    return random.choice(pool)
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -343,6 +397,16 @@ def interactions(evt: Interaction):
     log_interaction(evt.user_id, evt.item_id, evt.action)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
     return {"ok": True}
+
+
+@app.get("/fortune/{user_id}")
+def get_fortune(user_id: str):
+    history = USER_HISTORY.get(user_id, [])
+    return {
+        "user_id": user_id,
+        "history_count": len(history),
+        "fortune": generate_personalized_fortune(user_id),
+    }
 
 
 # Resets a user's vector, seen set, history, and active state back to a clean state

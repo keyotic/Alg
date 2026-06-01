@@ -8,7 +8,12 @@ const API = import.meta.env.DEV
   ? "http://localhost:8000"
   : "https://alg-backend.onrender.com";
 
-const USER_ID = sessionStorage.getItem("user_id") || `user-${crypto.randomUUID()}`;
+const existingUserId = sessionStorage.getItem("user_id");
+const USER_ID = existingUserId || `user-${crypto.randomUUID()}`;
+
+if (!existingUserId) {
+  sessionStorage.setItem("user_id", USER_ID);
+}
 
 function Card({ item, onLike, onSkip }) {
   const [dragX, setDragX] = useState(0);
@@ -172,6 +177,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const hasFinishedRef = useRef(false);
+  const isInternalNavigationRef = useRef(false);
 
   const maxInteractions = 20;
   const progressPercent = Math.min(
@@ -223,7 +229,7 @@ export default function App() {
 
   const goToNextPage = async () => {
     hasFinishedRef.current = true;
-    await resetSession();
+    isInternalNavigationRef.current = true;
     window.location.href = `${import.meta.env.BASE_URL}end1.html`;
   };
 
@@ -259,7 +265,7 @@ export default function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (hasFinishedRef.current) return;
+      if (hasFinishedRef.current || isInternalNavigationRef.current) return;
 
       const data = JSON.stringify({ user_id: USER_ID });
       navigator.sendBeacon(
