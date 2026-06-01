@@ -16,14 +16,22 @@
     </header>
 
     <div class="intro">
-        <p class="predictiontext" id="predictionText">Prediction</p>
+        <p class="predictiontext" id="predictionText">Reading your future...</p>
     </div>
 
     <script>
+        const API =
+            window.location.hostname === "localhost"
+                ? "http://localhost:8000"
+                : "https://alg-backend.onrender.com";
+
         const synth = window.speechSynthesis;
+        const userId = sessionStorage.getItem("user_id") || "stranger";
+
         let voices = [];
         let hasStarted = false;
         let speechStopped = false;
+        let isLeaving = false;
 
         function loadVoices() {
             voices = synth.getVoices();
@@ -86,15 +94,55 @@
             const predictionText = document.getElementById("predictionText").textContent.trim();
 
             const lines = [
-                
+                "The vision is clear...",
                 predictionText
             ];
 
             speakLines(lines);
         }
 
-        function goHome() {
+        async function loadFortune() {
+            try {
+                const res = await fetch(`${API}/fortune/${encodeURIComponent(userId)}`);
+                const data = await res.json();
+
+                document.getElementById("predictionText").textContent =
+                    data.fortune || "Your future is still taking shape.";
+
+                if (!hasStarted) {
+                    hasStarted = true;
+                    setTimeout(() => {
+                        if (!speechStopped && !isLeaving) {
+                            speakPrediction();
+                        }
+                    }, 900);
+                }
+            } catch (err) {
+                console.error("Failed to load fortune:", err);
+                document.getElementById("predictionText").textContent =
+                    "The future is clouded for now, but clarity will return soon.";
+            }
+        }
+
+        async function goHome() {
+            if (isLeaving) return;
+            isLeaving = true;
+
             stopSpeaking();
+
+            try {
+                await fetch(`${API}/reset`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                });
+            } catch (err) {
+                console.error("Reset failed:", err);
+            }
+
+            sessionStorage.removeItem("user_id");
             window.location.href = "Home.html";
         }
 
@@ -104,26 +152,19 @@
             if (speechSynthesis.onvoiceschanged !== undefined) {
                 speechSynthesis.onvoiceschanged = loadVoices;
             }
-
-            window.addEventListener("load", () => {
-                if (hasStarted) return;
-                hasStarted = true;
-
-                setTimeout(() => {
-                    if (!speechStopped) {
-                        speakPrediction();
-                    }
-                }, 900);
-            });
-
-            window.addEventListener("beforeunload", () => {
-                stopSpeaking();
-            });
-
-            window.addEventListener("pagehide", () => {
-                stopSpeaking();
-            });
         }
+
+        window.addEventListener("load", () => {
+            loadFortune();
+        });
+
+        window.addEventListener("beforeunload", () => {
+            stopSpeaking();
+        });
+
+        window.addEventListener("pagehide", () => {
+            stopSpeaking();
+        });
     </script>
 </body>
 </html>
