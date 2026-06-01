@@ -33,6 +33,7 @@ ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
+
 # Log orphaned IDs at startup — do NOT filter ITEM_IDS/ITEM_VECS
 # as FAISS row indices must stay perfectly aligned with ITEM_IDS
 orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
@@ -46,6 +47,11 @@ EMBED_DIM = ITEM_VECS.shape[1]
 # In-memory user vectors & seen set for demo
 USER_VEC = {}   # user_id -> np.array (d,)
 USER_SEEN = {}  # user_id -> set(item_id)
+
+# Admin/debug tracking
+USER_HISTORY = {}   # user_id -> list of {"item_id": str, "action": str, "ts": float}
+LAST_ACTIVE_USER = None
+LAST_ACTIVITY_AT = 0.0
 
 
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
@@ -122,6 +128,20 @@ def has_seen(uid: str, item_id: str):
     return item_id in USER_SEEN.get(uid, set())
 
 
+def mark_active(uid: str):
+    global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
+    LAST_ACTIVE_USER = uid
+    LAST_ACTIVITY_AT = time.time()
+
+
+def log_interaction(uid: str, item_id: str, action: str):
+    USER_HISTORY.setdefault(uid, []).append({
+        "item_id": item_id,
+        "action": action,
+        "ts": time.time(),
+    })
+
+
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
     u = USER_VEC.get(uid)
     if u is None:
@@ -149,8 +169,8 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
         if item_id not in ITEMS_META:
             continue
         pop = POPULARITY.get(item_id, 0.0)
-        recency = np.exp(-max(0, now - CREATED_AT.get(item_id, now)) / (7*24*3600))
-        s = alpha*float(sim) + beta*pop + gamma*recency
+        recency = np.exp(-max(0, now - CREATED_AT.get(item_id, now)) / (7 * 24 * 3600))
+        s = alpha * float(sim) + beta * pop + gamma * recency
         scored.append((item_id, s, row_idx))
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:topk]
@@ -163,6 +183,7 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
 
     if not cand_items:
         return []
+
     first = cand_items[0]
     selected.append(first)
     selected_vecs.append(ITEM_VECS[first[2]])
@@ -193,16 +214,18 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
 def convert_path_to_url(item):
     """Convert local file path to HTTP URL for frontend"""
     result = item.copy()
-    if result['path'].startswith('data/'):
-        filename = result['path'].split('/')[-1]
+    if result["path"].startswith("data/"):
+        filename = result["path"].split("/")[-1]
         base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-        result['path'] = f"{base_url}/images/{filename}"
+        result["path"] = f"{base_url}/images/{filename}"
     return result
 
 
 @app.post("/feed")
 def feed(req: FeedRequest):
     try:
+        mark_active(req.user_id)
+
         uid = req.user_id
         u = get_user_vec(uid)
         k_candidates = max(req.limit * 5, 100)
@@ -240,9 +263,9 @@ def feed(req: FeedRequest):
             cand = [
                 (ITEM_IDS[i], sims[j], i)
                 for j, i in enumerate(idxes)
-                if 0 <= i < len(ITEM_IDS)                              # valid FAISS row
-                and ITEM_IDS[i] in ITEMS_META                          # exists in metadata
-                and (not req.exclude_seen or not has_seen(uid, ITEM_IDS[i]))  # not seen
+                if 0 <= i < len(ITEM_IDS)
+                and ITEM_IDS[i] in ITEMS_META
+                and (not req.exclude_seen or not has_seen(uid, ITEM_IDS[i]))
             ]
 
             if len(cand) >= req.limit:
@@ -304,6 +327,8 @@ def feed(req: FeedRequest):
 
 @app.post("/interactions")
 def interactions(evt: Interaction):
+    mark_active(evt.user_id)
+
     if evt.action not in ("like", "skip"):
         raise HTTPException(status_code=400, detail="Invalid action")
     try:
@@ -315,16 +340,26 @@ def interactions(evt: Interaction):
     like = (evt.action == "like")
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
+    log_interaction(evt.user_id, evt.item_id, evt.action)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
     return {"ok": True}
 
 
-# Resets a user's vector and seen set back to a clean state
+# Resets a user's vector, seen set, history, and active state back to a clean state
 @app.post("/reset")
 def reset(req: ResetRequest):
+    global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
+
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
+    USER_HISTORY.pop(req.user_id, None)
+
+    if LAST_ACTIVE_USER == req.user_id:
+        LAST_ACTIVE_USER = None
+        LAST_ACTIVITY_AT = 0.0
+
     return {"ok": True}
+
 
 # ── Admin / Debug endpoints ────────────────────────────────────────────────
 
@@ -415,5 +450,4 @@ def admin_popularity():
 
 @app.post("/admin/preview-feed/{user_id}")
 def admin_preview_feed(user_id: str, limit: int = 15):
-    mark_active(user_id)
     return feed(FeedRequest(user_id=user_id, limit=limit, exclude_seen=True))
