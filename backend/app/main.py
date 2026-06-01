@@ -151,11 +151,17 @@ def generate_personalized_fortune(uid: str):
     skip_count = len(skips)
     total = like_count + skip_count
 
-    if total == 0:
+    if total == 1:
         pool = [
             "Your future is still unwritten, but possibility already surrounds you.",
             "The path ahead is quiet now, yet something meaningful is beginning.",
-            "A hidden opportunity is waiting for you to make the first move."
+            "A hidden opportunity is waiting for you to make the first move.",
+            "The first sign is subtle, but it will lead you somewhere worth finding.",
+            "What feels distant now will soon step closer than expected.",
+            "A quiet beginning is preparing a louder destiny.",
+            "Something small is already shifting in your favor.",
+            "The answer has not appeared yet, but the pattern has already begun.",
+            "A new path opens the moment you decide to notice it."
         ]
         return random.choice(pool)
 
@@ -166,31 +172,61 @@ def generate_personalized_fortune(uid: str):
         pool = [
             "You move toward life with confidence. A bold opportunity will soon reward your instincts.",
             "You know what draws you in, and that certainty will open an unexpected door.",
-            "Your future favors decisive energy. What you choose next may change more than you expect."
+            "Your future favors decisive energy. What you choose next may change more than you expect.",
+            "You follow desire without apology, and fortune responds to that courage.",
+            "The things you choose boldly now will echo back as luck later.",
+            "A risk you are ready for will soon reveal itself.",
+            "Your confidence is becoming a magnet for rare opportunities.",
+            "You are not waiting for the future. You are pulling it toward you.",
+            "A moment of fearless choice will set something powerful into motion."
         ]
     elif skip_count >= 12 and skip_ratio >= 0.7:
         pool = [
             "You are guided by discernment, not distraction. A clearer path is forming ahead of you.",
             "You know how to reject what is not meant for you. That wisdom will protect your future.",
-            "Your restraint is a strength. By turning away from the wrong things, you are making space for the right one."
+            "Your restraint is a strength. By turning away from the wrong things, you are making space for the right one.",
+            "Your future sharpens each time you refuse what does not fit.",
+            "Clarity is becoming your greatest advantage.",
+            "You are cutting through illusion, and that will soon reveal something real.",
+            "Your ability to say no is quietly shaping a more honest destiny.",
+            "You are not missing out. You are refining what truly belongs to you.",
+            "By filtering the noise, you are making room for something rare."
         ]
     elif like_count > skip_count:
         pool = [
             "You follow curiosity with an open heart. Soon, something new will feel instantly familiar.",
             "You are drawn to possibility, and that openness will bring a fortunate surprise.",
-            "Your future carries momentum. What excites you now is pointing toward what comes next."
+            "Your future carries momentum. What excites you now is pointing toward what comes next.",
+            "You are expanding faster than you realize, and the world is beginning to answer.",
+            "An unexpected invitation will match the energy you have been moving toward.",
+            "Your openness will lead you somewhere richer than your original plan.",
+            "What delights you now is more than a preference. It is a direction.",
+            "You are gathering signals from the future through what attracts you today.",
+            "A joyful instinct will soon prove wiser than logic alone."
         ]
     elif skip_count > like_count:
         pool = [
             "You trust your inner filter, and it is sharpening your destiny.",
             "You are narrowing the noise around you. What remains will matter deeply.",
-            "Your future grows clearer with every choice you refuse."
+            "Your future grows clearer with every choice you refuse.",
+            "You are learning through elimination, and that knowledge is powerful.",
+            "What you reject now is protecting the shape of what comes next.",
+            "The path ahead is becoming visible because you are no longer chasing everything.",
+            "There is power in your refusal, and it will soon reveal purpose.",
+            "By stepping away from the wrong things, you are drawing closer to the right one.",
+            "Your patience with imperfection will soon be rewarded by something unmistakable."
         ]
     else:
         pool = [
             "You balance instinct and caution with rare precision. A meaningful choice is approaching.",
             "You move carefully, but not fearfully. That balance will serve you well.",
-            "You are learning not only what you want, but why. That knowledge will shape your next chapter."
+            "You are learning not only what you want, but why. That knowledge will shape your next chapter.",
+            "You stand between desire and discernment, and that is where wisdom grows.",
+            "A balanced heart often sees what others miss.",
+            "You are not divided. You are measuring the world with care.",
+            "Because you weigh both impulse and restraint, your next step will carry unusual strength.",
+            "Your future is being built on thoughtful tension, and that makes it resilient.",
+            "The harmony between your curiosity and caution will soon reveal a powerful answer."
         ]
 
     return random.choice(pool)
