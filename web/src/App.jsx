@@ -76,7 +76,7 @@ function Card({ item, onLike, onSkip }) {
           alt={item.title || item.item_id}
           style={{
             width: "90%",
-            height: 1150,
+            height: 1000,
             objectFit: "cover",
             marginLeft: "3em",
             borderRadius: 20,
