@@ -120,7 +120,7 @@ button:focus-visible {
     
 }
 .introtext{
-   margin-top: 800px;
+   margin-top: 18em;
    margin-left: 3em;
    width: 800px;
    height: 180px;
@@ -155,11 +155,11 @@ button:focus-visible {
     border: 4px solid #FFF;
     color: #ffffff;
     margin-left: 13em;
-    margin-top: 73em;
+    margin-top: 68em;
 }
 
 .fintrotext{
-   margin-top: 800px;
+   margin-top: 750px;
    margin-left: 3em;
    width: 800px;
    height: 180px;
@@ -184,7 +184,7 @@ button:focus-visible {
     border: 4px solid #FFF;
     color: #ffffff;
     margin-left: 27em;
-    margin-top: 73em;
+    margin-top: 68em;
 }
 
 .namefield{
@@ -232,7 +232,7 @@ button:focus-visible {
 }
 
 .titleswipe{
-  margin-top: -80em;
+  margin-top: -79em;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -258,7 +258,7 @@ button:focus-visible {
   display: flex;
   justify-content: end;
   background-color: transparent;
-  margin-top: -93em;
+  margin-top: -79em;
   margin-left: 55em;
 }
 
