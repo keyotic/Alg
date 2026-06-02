@@ -248,6 +248,20 @@
       word-break: break-word;
     }
 
+    .fortune-pool-list {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .fortune-pool-list li {
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--text);
+      word-break: break-word;
+    }
+
     table {
       border-collapse: collapse;
       width: 100%;
@@ -407,8 +421,10 @@
               <div class="value" id="fortuneSegment">—</div>
             </div>
             <div class="fortune-meta-item">
-              <div class="label">Pool size</div>
-              <div class="value" id="fortunePoolSize">0</div>
+              <div class="label">Pool</div>
+              <div class="value">
+                <ul id="fortunePool" class="fortune-pool-list"></ul>
+              </div>
             </div>
             <div class="fortune-meta-item">
               <div class="label">Total interactions</div>
@@ -581,6 +597,24 @@
       });
     }
 
+    function renderFortunePool(pool) {
+      const list = document.getElementById("fortunePool");
+      list.innerHTML = "";
+
+      if (!Array.isArray(pool) || !pool.length) {
+        const li = document.createElement("li");
+        li.textContent = "No pool available.";
+        list.appendChild(li);
+        return;
+      }
+
+      pool.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+      });
+    }
+
     function setFortunePreview(data) {
       const hasUser = Boolean(data?.active_user);
 
@@ -592,8 +626,7 @@
       document.getElementById("fortuneSegment").textContent =
         hasUser ? (data?.fortune_segment || "—") : "—";
 
-      document.getElementById("fortunePoolSize").textContent =
-        hasUser ? String(data?.fortune_pool_size ?? 0) : "0";
+      renderFortunePool(hasUser ? (data?.fortune_pool || []) : []);
 
       document.getElementById("fortuneTotalInteractions").textContent =
         hasUser ? String(data?.fortune_total_interactions ?? 0) : "0";
@@ -610,7 +643,7 @@
         active_user: null,
         fortune_preview: null,
         fortune_segment: null,
-        fortune_pool_size: 0,
+        fortune_pool: [],
         fortune_total_interactions: 0,
         fortune_like_ratio: 0,
         fortune_skip_ratio: 0
