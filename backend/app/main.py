@@ -10,23 +10,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 
-
 # Go TWO levels up: backend/app/main.py -> backend/app -> backend -> AlgorithmCode (root)
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
-
 
 
 ROOT_ARTIFACTS = os.path.join(PROJECT_ROOT, "artifacts")
 ROOT_DATA = os.path.join(PROJECT_ROOT, "data")
 
 
-
 INDEX_PATH = os.getenv("INDEX_PATH", os.path.join(ROOT_ARTIFACTS, "faiss.index"))
 IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
-
 
 
 # Load FAISS + metadata on startup
@@ -38,7 +34,6 @@ with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
 
-
 # Log orphaned IDs at startup — do NOT filter ITEM_IDS/ITEM_VECS
 # as FAISS row indices must stay perfectly aligned with ITEM_IDS
 orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
@@ -46,15 +41,12 @@ if orphans:
     print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
 
 
-
 EMBED_DIM = ITEM_VECS.shape[1]
-
 
 
 # In-memory user vectors & seen set for demo
 USER_VEC = {}   # user_id -> np.array (d,)
 USER_SEEN = {}  # user_id -> set(item_id)
-
 
 # Admin/debug tracking
 USER_HISTORY = {}   # user_id -> list of {"item_id": str, "action": str, "ts": float}
@@ -62,10 +54,8 @@ LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
 
 
-
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
-
 
 
 class FeedRequest(BaseModel):
@@ -74,21 +64,17 @@ class FeedRequest(BaseModel):
     exclude_seen: bool = True
 
 
-
 class Interaction(BaseModel):
     user_id: str
     item_id: str
     action: str   # "like" or "skip"
 
 
-
 class ResetRequest(BaseModel):
     user_id: str
 
 
-
 app = FastAPI()
-
 
 
 # Exception middleware — MUST be added BEFORE CORSMiddleware
@@ -107,7 +93,6 @@ async def catch_exceptions(request: Request, call_next):
         )
 
 
-
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -118,10 +103,8 @@ app.add_middleware(
 )
 
 
-
 # Serve images
 app.mount("/images", StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")), name="images")
-
 
 
 @app.get("/healthz")
@@ -129,32 +112,26 @@ def healthz():
     return {"ok": True, "count": len(ITEM_IDS)}
 
 
-
 def get_user_vec(uid: str):
     return USER_VEC.get(uid, None)
-
 
 
 def set_user_vec(uid: str, v):
     USER_VEC[uid] = v
 
 
-
 def mark_seen(uid: str, item_id: str):
     USER_SEEN.setdefault(uid, set()).add(item_id)
-
 
 
 def has_seen(uid: str, item_id: str):
     return item_id in USER_SEEN.get(uid, set())
 
 
-
 def mark_active(uid: str):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
     LAST_ACTIVE_USER = uid
     LAST_ACTIVITY_AT = time.time()
-
 
 
 def log_interaction(uid: str, item_id: str, action: str):
@@ -165,17 +142,14 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
-
 def get_fortune_state(uid: str):
     history = USER_HISTORY.get(uid, [])
     likes = [h for h in history if h["action"] == "like"]
     skips = [h for h in history if h["action"] == "skip"]
 
-
     like_count = len(likes)
     skip_count = len(skips)
     total = like_count + skip_count
-
 
     if total <= 1:
         return {
@@ -198,10 +172,8 @@ def get_fortune_state(uid: str):
             ]
         }
 
-
     like_ratio = like_count / total
     skip_ratio = skip_count / total
-
 
     if like_count >= 12 and like_ratio >= 0.7:
         return {
@@ -305,25 +277,20 @@ def get_fortune_state(uid: str):
         }
 
 
-
 def get_preview_fortune(uid: str):
     state = get_fortune_state(uid)
     pool = state["pool"]
     total = state["total"]
 
-
     if not pool:
         return None
-
 
     idx = min(total, len(pool) - 1)
     return pool[idx]
 
 
-
 def generate_personalized_fortune(uid: str):
     return get_preview_fortune(uid)
-
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -339,7 +306,6 @@ def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 
         u /= np.linalg.norm(u) + 1e-8
     USER_VEC[uid] = u
     return u
-
 
 
 def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk: int):
@@ -360,21 +326,17 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
     return scored[:topk]
 
 
-
 def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0.7):
     selected = []
     selected_vecs = []
     cand_items = [(item_id, score, row_idx) for (item_id, score, row_idx) in candidates]
 
-
     if not cand_items:
         return []
-
 
     first = cand_items[0]
     selected.append(first)
     selected_vecs.append(ITEM_VECS[first[2]])
-
 
     while len(selected) < min(topn, len(cand_items)):
         best_idx = None
@@ -399,7 +361,6 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
     return selected
 
 
-
 def convert_path_to_url(item):
     result = item.copy()
     if result["path"].startswith("data/"):
@@ -409,126 +370,152 @@ def convert_path_to_url(item):
     return result
 
 
+def serialize_item(item_id: str, score: float = None, row_idx: int = None):
+    if item_id not in ITEMS_META:
+        return None
+    result = convert_path_to_url(ITEMS_META[item_id])
+    if score is not None:
+        result["score"] = float(score)
+    if row_idx is not None:
+        result["row_idx"] = int(row_idx)
+    return result
+
+
+def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
+    u = get_user_vec(uid)
+    k_candidates = max(limit * 5, 100)
+
+    if u is None:
+        items = []
+        for item_id in ITEM_IDS:
+            if item_id not in ITEMS_META:
+                continue
+            if not exclude_seen or not has_seen(uid, item_id):
+                items.append(item_id)
+            if len(items) >= limit * 3:
+                break
+
+        if include_debug:
+            result = [serialize_item(i) for i in items[:limit]]
+            return [x for x in result if x is not None]
+
+        return [convert_path_to_url(ITEMS_META[i]) for i in items[:limit]]
+
+    q = u.reshape(1, -1).astype("float32")
+
+    attempts = [
+        k_candidates,
+        k_candidates * 3,
+        k_candidates * 10,
+        len(ITEM_IDS)
+    ]
+
+    cand = []
+
+    for attempt_k in attempts:
+        attempt_k = min(attempt_k, len(ITEM_IDS))
+        sims, idxes = index.search(q, attempt_k)
+        idxes, sims = idxes[0], sims[0]
+
+        cand = [
+            (ITEM_IDS[i], float(sims[j]), i)
+            for j, i in enumerate(idxes)
+            if 0 <= i < len(ITEM_IDS)
+            and ITEM_IDS[i] in ITEMS_META
+            and (not exclude_seen or not has_seen(uid, ITEM_IDS[i]))
+        ]
+
+        if len(cand) >= limit:
+            break
+
+    if len(cand) < limit:
+        liked_seen = {
+            iid for iid in USER_SEEN.get(uid, set())
+            if POPULARITY.get(iid, 0.0) > 0
+        }
+
+        sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
+        idxes, sims = idxes[0], sims[0]
+        cand = [
+            (ITEM_IDS[i], float(sims[j]), i)
+            for j, i in enumerate(idxes)
+            if 0 <= i < len(ITEM_IDS)
+            and ITEM_IDS[i] in ITEMS_META
+            and ITEM_IDS[i] not in liked_seen
+        ]
+
+    if len(cand) < limit:
+        already = {c[0] for c in cand}
+        for i, item_id in enumerate(ITEM_IDS):
+            if (
+                item_id in ITEMS_META
+                and item_id not in already
+                and item_id not in USER_SEEN.get(uid, set())
+            ):
+                sim = float(np.dot(u, ITEM_VECS[i]))
+                cand.append((item_id, sim, i))
+            if len(cand) >= limit * 2:
+                break
+
+    if not cand:
+        return []
+
+    scored = score_items(
+        u,
+        np.array([c[2] for c in cand]),
+        np.array([c[1] for c in cand]),
+        len(cand)
+    )
+    reranked = mmr_rerank(u, scored, limit, lam=0.7)
+
+    if include_debug:
+        result = [
+            serialize_item(iid, score=score, row_idx=row_idx)
+            for (iid, score, row_idx) in reranked
+            if iid in ITEMS_META
+        ]
+        return [x for x in result if x is not None]
+
+    return [
+        convert_path_to_url(ITEMS_META[iid])
+        for (iid, _, _) in reranked
+        if iid in ITEMS_META
+    ]
+
+
+def get_current_feed_preview(uid: str, limit: int = 8, skip_first: bool = True):
+    feed_items = build_feed_items(
+        uid=uid,
+        limit=(limit + 1) if skip_first else limit,
+        exclude_seen=True,
+        include_debug=True,
+    )
+
+    if skip_first and len(feed_items) > 0:
+        feed_items = feed_items[1:]
+
+    return feed_items[:limit]
+
 
 @app.post("/feed")
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
-
-
-        uid = req.user_id
-        u = get_user_vec(uid)
-        k_candidates = max(req.limit * 5, 100)
-
-
-        if u is None:
-            items = []
-            for item_id in ITEM_IDS:
-                if item_id not in ITEMS_META:
-                    continue
-                if not req.exclude_seen or not has_seen(uid, item_id):
-                    items.append(item_id)
-                if len(items) >= req.limit * 3:
-                    break
-            result = [convert_path_to_url(ITEMS_META[i]) for i in items[:req.limit]]
-            return {"items": result}
-
-
-        q = u.reshape(1, -1).astype("float32")
-
-
-        attempts = [
-            k_candidates,
-            k_candidates * 3,
-            k_candidates * 10,
-            len(ITEM_IDS)
-        ]
-
-
-        cand = []
-
-
-        for attempt_k in attempts:
-            attempt_k = min(attempt_k, len(ITEM_IDS))
-            sims, idxes = index.search(q, attempt_k)
-            idxes, sims = idxes[0], sims[0]
-
-
-            cand = [
-                (ITEM_IDS[i], sims[j], i)
-                for j, i in enumerate(idxes)
-                if 0 <= i < len(ITEM_IDS)
-                and ITEM_IDS[i] in ITEMS_META
-                and (not req.exclude_seen or not has_seen(uid, ITEM_IDS[i]))
-            ]
-
-
-            if len(cand) >= req.limit:
-                break
-
-
-        if len(cand) < req.limit:
-            liked_seen = {
-                iid for iid in USER_SEEN.get(uid, set())
-                if POPULARITY.get(iid, 0.0) > 0
-            }
-            USER_SEEN[uid] = liked_seen
-
-
-            sims, idxes = index.search(q, k_candidates)
-            idxes, sims = idxes[0], sims[0]
-            cand = [
-                (ITEM_IDS[i], sims[j], i)
-                for j, i in enumerate(idxes)
-                if 0 <= i < len(ITEM_IDS)
-                and ITEM_IDS[i] in ITEMS_META
-                and ITEM_IDS[i] not in liked_seen
-            ]
-
-
-        if len(cand) < req.limit:
-            already = {c[0] for c in cand}
-            for i, item_id in enumerate(ITEM_IDS):
-                if (
-                    item_id in ITEMS_META
-                    and item_id not in already
-                    and item_id not in USER_SEEN.get(uid, set())
-                ):
-                    sim = float(np.dot(u, ITEM_VECS[i]))
-                    cand.append((item_id, sim, i))
-                if len(cand) >= req.limit * 2:
-                    break
-
-
-        if not cand:
-            return {"items": []}
-
-
-        scored = score_items(
-            u,
-            np.array([c[2] for c in cand]),
-            np.array([c[1] for c in cand]),
-            len(cand)
+        items = build_feed_items(
+            uid=req.user_id,
+            limit=req.limit,
+            exclude_seen=req.exclude_seen,
+            include_debug=False
         )
-        reranked = mmr_rerank(u, scored, req.limit, lam=0.7)
-        final_items = [
-            convert_path_to_url(ITEMS_META[iid])
-            for (iid, _, _) in reranked
-            if iid in ITEMS_META
-        ]
-        return {"items": final_items}
-
-
+        return {"items": items}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/interactions")
 def interactions(evt: Interaction):
     mark_active(evt.user_id)
-
 
     if evt.action not in ("like", "skip"):
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -537,7 +524,6 @@ def interactions(evt: Interaction):
     except ValueError:
         raise HTTPException(status_code=404, detail="Unknown item_id")
 
-
     item_vec = ITEM_VECS[row_idx]
     like = (evt.action == "like")
     update_user_vector(evt.user_id, item_vec, like)
@@ -545,7 +531,6 @@ def interactions(evt: Interaction):
     log_interaction(evt.user_id, evt.item_id, evt.action)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
     return {"ok": True}
-
 
 
 @app.get("/fortune/{user_id}")
@@ -566,24 +551,19 @@ def get_fortune(user_id: str):
     }
 
 
-
 @app.post("/reset")
 def reset(req: ResetRequest):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
-
 
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
     USER_HISTORY.pop(req.user_id, None)
 
-
     if LAST_ACTIVE_USER == req.user_id:
         LAST_ACTIVE_USER = None
         LAST_ACTIVITY_AT = 0.0
 
-
     return {"ok": True}
-
 
 
 @app.get("/admin/users")
@@ -606,14 +586,13 @@ def admin_users():
     }
 
 
-
 @app.get("/admin/user/{user_id}")
 def admin_user_detail(user_id: str):
     history = USER_HISTORY.get(user_id, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(user_id)
-
+    current_feed = get_current_feed_preview(user_id, limit=8, skip_first=True)
 
     return {
         "user_id": user_id,
@@ -632,8 +611,8 @@ def admin_user_detail(user_id: str):
         "fortune_total_interactions": state["total"],
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
+        "current_feed": current_feed,
     }
-
 
 
 @app.get("/admin/current-user")
@@ -655,15 +634,15 @@ def admin_current_user():
             "fortune_total_interactions": 0,
             "fortune_like_ratio": 0.0,
             "fortune_skip_ratio": 0.0,
+            "current_feed": [],
         }
-
 
     uid = LAST_ACTIVE_USER
     history = USER_HISTORY.get(uid, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(uid)
-
+    current_feed = get_current_feed_preview(uid, limit=8, skip_first=True)
 
     return {
         "active_user": uid,
@@ -681,8 +660,8 @@ def admin_current_user():
         "fortune_total_interactions": state["total"],
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
+        "current_feed": current_feed,
     }
-
 
 
 @app.get("/admin/popularity")
@@ -697,7 +676,20 @@ def admin_popularity():
     }
 
 
+@app.get("/admin/current-feed/{user_id}")
+def admin_current_feed(user_id: str, limit: int = 8):
+    return {
+        "user_id": user_id,
+        "current_feed": get_current_feed_preview(user_id, limit=limit, skip_first=True)
+    }
+
 
 @app.post("/admin/preview-feed/{user_id}")
 def admin_preview_feed(user_id: str, limit: int = 15):
-    return feed(FeedRequest(user_id=user_id, limit=limit, exclude_seen=True))
+    items = build_feed_items(
+        uid=user_id,
+        limit=limit,
+        exclude_seen=True,
+        include_debug=False
+    )
+    return {"items": items}
