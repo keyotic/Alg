@@ -323,7 +323,7 @@ export default function App() {
                 overflow: "hidden",
                 border: "5px solid #ffffff",
                 padding: 25,
-                marginTop: "-11em",
+                marginTop: "-8em",
                 marginLeft: "-2em",
               }}
             >
