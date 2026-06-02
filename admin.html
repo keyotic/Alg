@@ -330,6 +330,7 @@
       border-radius: 10px;
       border: 1px solid var(--border);
       background: #f3f6fb;
+      display: block;
     }
 
     .item-cell {
@@ -663,11 +664,14 @@
     }
 
     function clearTableBody(tableId) {
-      document.querySelector(`#${tableId} tbody`).innerHTML = "";
+      const tbody = document.querySelector(`#${tableId} tbody`);
+      if (tbody) tbody.innerHTML = "";
     }
 
     function addRow(tableId, cells, renderAsCode = false) {
       const tbody = document.querySelector(`#${tableId} tbody`);
+      if (!tbody) return;
+
       const tr = document.createElement("tr");
 
       cells.forEach(cell => {
@@ -690,7 +694,8 @@
     }
 
     function setEmptyState(id, visible) {
-      document.getElementById(id).style.display = visible ? "block" : "none";
+      const el = document.getElementById(id);
+      if (el) el.style.display = visible ? "block" : "none";
     }
 
     function formatPercent(value) {
@@ -703,10 +708,26 @@
       return value.toFixed(4);
     }
 
+    function formatTimestamp(ts) {
+      if (!ts) return "";
+      const numericTs = typeof ts === "string" ? Number(ts) : ts;
+      if (!Number.isNaN(numericTs) && Number.isFinite(numericTs)) {
+        const date = new Date(numericTs * 1000);
+        if (!Number.isNaN(date.getTime())) return date.toLocaleString();
+      }
+      const parsed = new Date(ts);
+      return Number.isNaN(parsed.getTime()) ? String(ts) : parsed.toLocaleString();
+    }
+
+    function getActiveUser(data) {
+      return data?.active_user || data?.user_id || null;
+    }
+
     function setSummary(data) {
-      document.getElementById("summaryUser").textContent = data?.active_user || "—";
+      const activeUser = getActiveUser(data);
+      document.getElementById("summaryUser").textContent = activeUser || "—";
       document.getElementById("summaryVector").textContent =
-        data?.active_user ? String(Boolean(data.has_vector)) : "—";
+        activeUser ? String(Boolean(data?.has_vector)) : "—";
       document.getElementById("summarySeen").textContent = data?.total_seen ?? 0;
       document.getElementById("summaryLikes").textContent = data?.liked_count ?? 0;
       document.getElementById("summarySkips").textContent = data?.skipped_count ?? 0;
@@ -744,7 +765,7 @@
     }
 
     function setFortunePreview(data) {
-      const hasUser = Boolean(data?.active_user);
+      const hasUser = Boolean(getActiveUser(data));
 
       document.getElementById("fortunePreviewText").textContent =
         hasUser
@@ -752,12 +773,12 @@
           : "No active user right now.";
 
       document.getElementById("fortuneSegment").textContent =
-        hasUser ? (data?.fortune_segment || "—") : "—";
+        hasUser ? (data?.fortune_segment || data?.segment || "—") : "—";
 
       renderFortunePool(hasUser ? (data?.fortune_pool || []) : []);
 
       document.getElementById("fortuneTotalInteractions").textContent =
-        hasUser ? String(data?.fortune_total_interactions ?? 0) : "0";
+        hasUser ? String(data?.fortune_total_interactions ?? data?.history_count ?? 0) : "0";
 
       document.getElementById("fortuneLikeRatio").textContent =
         hasUser ? formatPercent(data?.fortune_like_ratio ?? 0) : "0%";
@@ -780,12 +801,6 @@
         fortune_skip_ratio: 0,
         feed_debug_mode: null
       });
-    }
-
-    function formatTimestamp(ts) {
-      if (!ts) return "";
-      const date = new Date(ts * 1000);
-      return date.toLocaleString();
     }
 
     function updateLastRefresh() {
@@ -815,12 +830,25 @@
     }
 
     function makePreviewCell(item) {
-      if (!item?.path) return "—";
+      if (!item?.path) {
+        const span = document.createElement("span");
+        span.className = "muted";
+        span.textContent = "—";
+        return span;
+      }
+
       const img = document.createElement("img");
       img.src = item.path;
       img.alt = item.title || item.item_id || "preview";
       img.className = "thumb";
       img.loading = "lazy";
+      img.referrerPolicy = "no-referrer";
+      img.onerror = () => {
+        const fallback = document.createElement("span");
+        fallback.className = "muted";
+        fallback.textContent = "Image unavailable";
+        img.replaceWith(fallback);
+      };
       return img;
     }
 
@@ -830,7 +858,7 @@
 
       const title = document.createElement("div");
       title.className = "item-title";
-      title.textContent = item?.title || item?.item_id || "Untitled";
+      title.textContent = item?.title || item?.name || item?.item_id || "Untitled";
 
       const path = document.createElement("div");
       path.className = "item-path";
@@ -841,16 +869,23 @@
       return wrap;
     }
 
+    function normalizeItems(items) {
+      if (!Array.isArray(items)) return [];
+      return items.filter(item => item && typeof item === "object");
+    }
+
     function renderItemTable(tableId, emptyId, items) {
       clearTableBody(tableId);
       setEmptyState(emptyId, false);
 
-      if (!Array.isArray(items) || !items.length) {
+      const normalized = normalizeItems(items);
+
+      if (!normalized.length) {
         setEmptyState(emptyId, true);
         return;
       }
 
-      items.forEach((item, index) => {
+      normalized.forEach((item, index) => {
         addRow(tableId, [
           index + 1,
           makePreviewCell(item),
@@ -892,7 +927,9 @@
       setEmptyState("scoredPoolEmpty", false);
       setEmptyState("rerankedPoolEmpty", false);
 
-      if (!data.active_user) {
+      const activeUser = getActiveUser(data);
+
+      if (!activeUser) {
         resetSummary();
         resetFortunePreview();
         resetFeedTables();
@@ -908,49 +945,49 @@
       setFortunePreview(data);
 
       addRow("currentUserTable", [
-        data.active_user,
-        String(data.has_vector),
-        data.total_seen,
-        data.liked_count,
-        data.skipped_count,
-        formatTimestamp(data.last_activity_at)
+        activeUser,
+        String(Boolean(data?.has_vector)),
+        data?.total_seen ?? 0,
+        data?.liked_count ?? 0,
+        data?.skipped_count ?? 0,
+        formatTimestamp(data?.last_activity_at) || "—"
       ]);
 
-      if ((data.liked || []).length) {
+      if (Array.isArray(data?.liked) && data.liked.length) {
         data.liked.forEach(itemId => addRow("likedTable", [itemId], true));
       } else {
         setEmptyState("likedEmpty", true);
       }
 
-      if ((data.skipped || []).length) {
+      if (Array.isArray(data?.skipped) && data.skipped.length) {
         data.skipped.forEach(itemId => addRow("skippedTable", [itemId], true));
       } else {
         setEmptyState("skippedEmpty", true);
       }
 
-      if ((data.history || []).length) {
+      if (Array.isArray(data?.history) && data.history.length) {
         data.history.forEach((entry, index) => {
           const actionPill = document.createElement("span");
           actionPill.className = `pill ${entry.action === "like" ? "like" : "skip"}`;
-          actionPill.textContent = entry.action;
+          actionPill.textContent = entry.action || "—";
 
           addRow("historyTable", [
             index + 1,
-            entry.item_id,
+            entry.item_id || "—",
             actionPill,
-            formatTimestamp(entry.ts)
-          ], false);
+            formatTimestamp(entry.ts) || "—"
+          ]);
         });
       } else {
         setEmptyState("historyEmpty", true);
       }
 
-      renderItemTable("nextItemsTable", "nextItemsEmpty", data.next_items || []);
-      renderItemTable("candidatePoolTable", "candidatePoolEmpty", data.candidate_pool || []);
-      renderItemTable("scoredPoolTable", "scoredPoolEmpty", data.scored_pool || []);
-      renderItemTable("rerankedPoolTable", "rerankedPoolEmpty", data.reranked_pool || []);
+      renderItemTable("nextItemsTable", "nextItemsEmpty", data?.next_items || []);
+      renderItemTable("candidatePoolTable", "candidatePoolEmpty", data?.candidate_pool || []);
+      renderItemTable("scoredPoolTable", "scoredPoolEmpty", data?.scored_pool || []);
+      renderItemTable("rerankedPoolTable", "rerankedPoolEmpty", data?.reranked_pool || []);
 
-      setStatus(`Showing live data for ${data.active_user}.`, "ok");
+      setStatus(`Showing live data for ${activeUser}.`, "ok");
     }
 
     async function loadCurrentUser() {
@@ -996,9 +1033,7 @@
       pollingPaused = !pollingPaused;
       e.currentTarget.textContent = pollingPaused ? "Resume auto-refresh" : "Pause auto-refresh";
       setStatus(
-        pollingPaused
-          ? "Auto-refresh paused."
-          : "Auto-refresh resumed.",
+        pollingPaused ? "Auto-refresh paused." : "Auto-refresh resumed.",
         pollingPaused ? "loading" : "ok"
       );
     });
