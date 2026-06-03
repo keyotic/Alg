@@ -10,19 +10,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 
+
 # Go TWO levels up: backend/app/main.py -> backend/app -> backend -> AlgorithmCode (root)
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+
 
 
 ROOT_ARTIFACTS = os.path.join(PROJECT_ROOT, "artifacts")
 ROOT_DATA = os.path.join(PROJECT_ROOT, "data")
 
 
+
 INDEX_PATH = os.getenv("INDEX_PATH", os.path.join(ROOT_ARTIFACTS, "faiss.index"))
 IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
+
 
 
 # Load FAISS + metadata on startup
@@ -34,6 +38,7 @@ with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
 
+
 # Log orphaned IDs at startup — do NOT filter ITEM_IDS/ITEM_VECS
 # as FAISS row indices must stay perfectly aligned with ITEM_IDS
 orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
@@ -41,21 +46,28 @@ if orphans:
     print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
 
 
+
 EMBED_DIM = ITEM_VECS.shape[1]
+
 
 
 # In-memory user vectors & seen set for demo
 USER_VEC = {}   # user_id -> np.array (d,)
 USER_SEEN = {}  # user_id -> set(item_id)
 
+
 # Admin/debug tracking
-USER_HISTORY = {}   # user_id -> list of {"item_id": str, "action": str, "ts": float}
+USER_HISTORY = {}       # user_id -> list of {"item_id": str, "action": str, "ts": float}
+USER_CURRENT_FEED = {}  # user_id -> list of item dicts (the live batch from last /feed call)
+USER_FEED_INDEX = {}    # user_id -> int (index of the item currently on screen)
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
 
 
+
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
+
 
 
 class FeedRequest(BaseModel):
@@ -64,17 +76,27 @@ class FeedRequest(BaseModel):
     exclude_seen: bool = True
 
 
+
 class Interaction(BaseModel):
     user_id: str
     item_id: str
     action: str   # "like" or "skip"
 
 
+
+class Advance(BaseModel):
+    user_id: str
+    item_id: str  # the item NOW on screen
+
+
+
 class ResetRequest(BaseModel):
     user_id: str
 
 
+
 app = FastAPI()
+
 
 
 # Exception middleware — MUST be added BEFORE CORSMiddleware
@@ -93,6 +115,7 @@ async def catch_exceptions(request: Request, call_next):
         )
 
 
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -103,8 +126,10 @@ app.add_middleware(
 )
 
 
+
 # Serve images
 app.mount("/images", StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")), name="images")
+
 
 
 @app.get("/healthz")
@@ -112,20 +137,25 @@ def healthz():
     return {"ok": True, "count": len(ITEM_IDS)}
 
 
+
 def get_user_vec(uid: str):
     return USER_VEC.get(uid, None)
+
 
 
 def set_user_vec(uid: str, v):
     USER_VEC[uid] = v
 
 
+
 def mark_seen(uid: str, item_id: str):
     USER_SEEN.setdefault(uid, set()).add(item_id)
 
 
+
 def has_seen(uid: str, item_id: str):
     return item_id in USER_SEEN.get(uid, set())
+
 
 
 def mark_active(uid: str):
@@ -134,12 +164,14 @@ def mark_active(uid: str):
     LAST_ACTIVITY_AT = time.time()
 
 
+
 def log_interaction(uid: str, item_id: str, action: str):
     USER_HISTORY.setdefault(uid, []).append({
         "item_id": item_id,
         "action": action,
         "ts": time.time(),
     })
+
 
 
 def get_fortune_state(uid: str):
@@ -277,6 +309,7 @@ def get_fortune_state(uid: str):
         }
 
 
+
 def get_preview_fortune(uid: str):
     state = get_fortune_state(uid)
     pool = state["pool"]
@@ -289,8 +322,10 @@ def get_preview_fortune(uid: str):
     return pool[idx]
 
 
+
 def generate_personalized_fortune(uid: str):
     return get_preview_fortune(uid)
+
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -306,6 +341,7 @@ def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 
         u /= np.linalg.norm(u) + 1e-8
     USER_VEC[uid] = u
     return u
+
 
 
 def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk: int):
@@ -324,6 +360,7 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
         scored.append((item_id, s, row_idx))
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:topk]
+
 
 
 def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0.7):
@@ -361,6 +398,7 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
     return selected
 
 
+
 def convert_path_to_url(item):
     result = item.copy()
     if result["path"].startswith("data/"):
@@ -368,6 +406,7 @@ def convert_path_to_url(item):
         base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
         result["path"] = f"{base_url}/images/{filename}"
     return result
+
 
 
 def serialize_item(item_id: str, score: float = None, row_idx: int = None):
@@ -379,6 +418,7 @@ def serialize_item(item_id: str, score: float = None, row_idx: int = None):
     if row_idx is not None:
         result["row_idx"] = int(row_idx)
     return result
+
 
 
 def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
@@ -483,34 +523,76 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
     ]
 
 
-def get_current_feed_preview(uid: str, limit: int = 8, skip_first: bool = True):
-    feed_items = build_feed_items(
-        uid=uid,
-        limit=(limit + 1) if skip_first else limit,
-        exclude_seen=True,
-        include_debug=True,
-    )
 
-    if skip_first and len(feed_items) > 0:
-        feed_items = feed_items[1:]
+def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
+    # Read from the stored live batch so the admin view matches the frontend exactly.
+    # Returns [] if the user hasn't called /feed yet (nothing to show before first load).
+    stored_feed = USER_CURRENT_FEED.get(uid)
 
-    return feed_items[:limit]
+    if not stored_feed:
+        return []
+
+    current_idx = USER_FEED_INDEX.get(uid, 0)
+
+    if include_active:
+        feed_slice = stored_feed[current_idx:]
+    else:
+        feed_slice = stored_feed[current_idx + 1:]
+
+    feed_slice = feed_slice[:limit]
+
+    annotated = []
+    for i, item in enumerate(feed_slice):
+        item = item.copy()
+        item["position"] = current_idx + i + 1  # absolute position in the full batch
+        item["is_active"] = (i == 0)
+        annotated.append(item)
+
+    return annotated
+
 
 
 @app.post("/feed")
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
+        # Build with include_debug=True so we can store score/row_idx for the admin preview.
         items = build_feed_items(
             uid=req.user_id,
             limit=req.limit,
             exclude_seen=req.exclude_seen,
-            include_debug=False
+            include_debug=True
         )
-        return {"items": items}
+        # Store the live batch. Do NOT reset the pointer here — /advance will set it
+        # to the exact item the frontend is showing first.
+        USER_CURRENT_FEED[req.user_id] = items
+        # Strip debug fields before returning to the frontend — no behaviour change for clients.
+        clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
+        return {"items": clean}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.post("/advance")
+def advance(req: Advance):
+    """
+    Called by the frontend immediately after it displays a new item (on first load
+    and after every swipe). Tells the backend exactly which item_id is now on screen
+    so the admin preview stays perfectly in sync regardless of batch ordering.
+    """
+    mark_active(req.user_id)
+
+    stored_feed = USER_CURRENT_FEED.get(req.user_id, [])
+    for i, item in enumerate(stored_feed):
+        if item.get("item_id") == req.item_id:
+            USER_FEED_INDEX[req.user_id] = i
+            return {"ok": True}
+
+    # item_id not found in current batch — pointer stays where it is
+    return {"ok": True}
+
 
 
 @app.post("/interactions")
@@ -530,7 +612,9 @@ def interactions(evt: Interaction):
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
+
     return {"ok": True}
+
 
 
 @app.get("/fortune/{user_id}")
@@ -551,6 +635,7 @@ def get_fortune(user_id: str):
     }
 
 
+
 @app.post("/reset")
 def reset(req: ResetRequest):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
@@ -558,12 +643,15 @@ def reset(req: ResetRequest):
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
     USER_HISTORY.pop(req.user_id, None)
+    USER_CURRENT_FEED.pop(req.user_id, None)
+    USER_FEED_INDEX.pop(req.user_id, None)
 
     if LAST_ACTIVE_USER == req.user_id:
         LAST_ACTIVE_USER = None
         LAST_ACTIVITY_AT = 0.0
 
     return {"ok": True}
+
 
 
 @app.get("/admin/users")
@@ -586,13 +674,14 @@ def admin_users():
     }
 
 
+
 @app.get("/admin/user/{user_id}")
 def admin_user_detail(user_id: str):
     history = USER_HISTORY.get(user_id, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(user_id)
-    current_feed = get_current_feed_preview(user_id, limit=8, skip_first=True)
+    current_feed = get_current_feed_preview(user_id, limit=8, include_active=True)
 
     return {
         "user_id": user_id,
@@ -613,6 +702,7 @@ def admin_user_detail(user_id: str):
         "fortune_skip_ratio": state["skip_ratio"],
         "current_feed": current_feed,
     }
+
 
 
 @app.get("/admin/current-user")
@@ -642,7 +732,7 @@ def admin_current_user():
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(uid)
-    current_feed = get_current_feed_preview(uid, limit=8, skip_first=True)
+    current_feed = get_current_feed_preview(uid, limit=8, include_active=True)
 
     return {
         "active_user": uid,
@@ -664,6 +754,7 @@ def admin_current_user():
     }
 
 
+
 @app.get("/admin/popularity")
 def admin_popularity():
     sorted_items = sorted(POPULARITY.items(), key=lambda x: x[1], reverse=True)
@@ -676,12 +767,14 @@ def admin_popularity():
     }
 
 
+
 @app.get("/admin/current-feed/{user_id}")
 def admin_current_feed(user_id: str, limit: int = 8):
     return {
         "user_id": user_id,
-        "current_feed": get_current_feed_preview(user_id, limit=limit, skip_first=True)
+        "current_feed": get_current_feed_preview(user_id, limit=limit, include_active=True)
     }
+
 
 
 @app.post("/admin/preview-feed/{user_id}")

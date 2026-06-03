@@ -18,11 +18,12 @@
       --error: #c62828;
       --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
       --radius: 16px;
+      --active-bg: #f0fdf4;
+      --active-border: #bfe8cf;
+      --active-text: #0b6b3a;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -33,19 +34,10 @@
       color: var(--text);
     }
 
-    h1, h2, h3 {
-      margin: 0 0 12px;
-      line-height: 1.2;
-    }
+    h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; }
+    p { margin: 0; }
 
-    p {
-      margin: 0;
-    }
-
-    .page {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
+    .page { max-width: 1400px; margin: 0 auto; }
 
     .hero {
       background: var(--panel);
@@ -64,15 +56,8 @@
       flex-wrap: wrap;
     }
 
-    .meta {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .meta + .meta {
-      margin-top: 6px;
-    }
+    .meta { margin-top: 10px; color: var(--muted); font-size: 14px; }
+    .meta + .meta { margin-top: 6px; }
 
     .toolbar {
       display: flex;
@@ -91,10 +76,7 @@
       font-size: 14px;
     }
 
-    button.secondary {
-      background: #fff;
-      color: var(--accent);
-    }
+    button.secondary { background: #fff; color: var(--accent); }
 
     .badge {
       display: inline-flex;
@@ -126,42 +108,14 @@
       margin-bottom: 24px;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: 1.1fr 1fr;
-      gap: 24px;
-      align-items: start;
-    }
+    .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px; align-items: start; }
+    .stack { display: grid; gap: 24px; }
 
-    .stack {
-      display: grid;
-      gap: 24px;
-    }
-
-    .status {
-      margin-top: 8px;
-      font-size: 14px;
-    }
-
-    .loading {
-      color: var(--muted);
-    }
-
-    .error {
-      color: var(--error);
-      font-weight: bold;
-    }
-
-    .ok {
-      color: var(--success);
-      font-weight: bold;
-    }
-
-    .empty {
-      color: var(--muted);
-      padding: 14px 0 2px;
-      font-style: italic;
-    }
+    .status { margin-top: 8px; font-size: 14px; }
+    .loading { color: var(--muted); }
+    .error { color: var(--error); font-weight: bold; }
+    .ok { color: var(--success); font-weight: bold; }
+    .empty { color: var(--muted); padding: 14px 0 2px; font-style: italic; }
 
     .summary {
       display: grid;
@@ -185,10 +139,7 @@
       letter-spacing: 0.04em;
     }
 
-    .summary-card .value {
-      font-size: 22px;
-      font-weight: bold;
-    }
+    .summary-card .value { font-size: 22px; font-weight: bold; }
 
     .fortune-grid {
       display: grid;
@@ -197,8 +148,7 @@
       margin-top: 12px;
     }
 
-    .fortune-box,
-    .fortune-meta {
+    .fortune-box, .fortune-meta {
       border: 1px solid var(--border);
       border-radius: 14px;
       background: #fbfcff;
@@ -222,10 +172,7 @@
       font-weight: bold;
     }
 
-    .fortune-meta-list {
-      display: grid;
-      gap: 12px;
-    }
+    .fortune-meta-list { display: grid; gap: 12px; }
 
     .fortune-meta-item {
       border: 1px solid var(--border);
@@ -242,11 +189,7 @@
       margin-bottom: 6px;
     }
 
-    .fortune-meta-item .value {
-      font-size: 16px;
-      font-weight: bold;
-      word-break: break-word;
-    }
+    .fortune-meta-item .value { font-size: 16px; font-weight: bold; word-break: break-word; }
 
     table {
       border-collapse: collapse;
@@ -264,23 +207,44 @@
       font-size: 14px;
     }
 
-    th {
-      background: #f3f6fb;
+    th { background: #f3f6fb; }
+    td code { font-family: Consolas, monospace; font-size: 13px; word-break: break-word; }
+
+    /* Active item row highlight */
+    tr.active-row { background: var(--active-bg) !important; }
+    tr.active-row td { border-color: var(--active-border); }
+
+    .active-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #e8f7ef;
+      color: var(--active-text);
+      border: 1px solid var(--active-border);
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
-    td code {
-      font-family: Consolas, monospace;
-      font-size: 13px;
-      word-break: break-word;
+    .active-badge .dot-active {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--active-text);
+      display: inline-block;
+      animation: pulse 1.4s ease-in-out infinite;
     }
 
-    .scroll {
-      overflow-x: auto;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
     }
 
-    .muted {
-      color: var(--muted);
-    }
+    .scroll { overflow-x: auto; }
+    .muted { color: var(--muted); }
 
     .pill {
       display: inline-block;
@@ -291,17 +255,8 @@
       border: 1px solid transparent;
     }
 
-    .pill.like {
-      color: #0b6b3a;
-      background: #e8f7ef;
-      border-color: #bfe8cf;
-    }
-
-    .pill.skip {
-      color: #8a5a10;
-      background: #fff4df;
-      border-color: #efd39c;
-    }
+    .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
+    .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
 
     .thumb {
       width: 56px;
@@ -312,56 +267,22 @@
       background: #f3f6fb;
     }
 
-    .title-cell {
-      min-width: 220px;
-    }
-
-    .path-cell {
-      min-width: 260px;
-      word-break: break-all;
-    }
+    .title-cell { min-width: 220px; }
+    .path-cell { min-width: 260px; word-break: break-all; }
 
     @media (max-width: 980px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .summary {
-        grid-template-columns: repeat(2, minmax(140px, 1fr));
-      }
-
-      .fortune-grid {
-        grid-template-columns: 1fr;
-      }
+      .grid { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .fortune-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 560px) {
-      body {
-        padding: 14px;
-      }
-
-      .hero,
-      .section {
-        padding: 16px;
-      }
-
-      .summary {
-        grid-template-columns: 1fr;
-      }
-
-      th, td {
-        font-size: 13px;
-        padding: 9px 10px;
-      }
-
-      .fortune-box blockquote {
-        font-size: 17px;
-      }
-
-      .thumb {
-        width: 48px;
-        height: 48px;
-      }
+      body { padding: 14px; }
+      .hero, .section { padding: 16px; }
+      .summary { grid-template-columns: 1fr; }
+      th, td { font-size: 13px; padding: 9px 10px; }
+      .fortune-box blockquote { font-size: 17px; }
+      .thumb { width: 48px; height: 48px; }
     }
   </style>
 </head>
@@ -452,12 +373,13 @@
 
     <div class="section">
       <h2>Current Feed</h2>
-      <p class="muted">This shows the items currently lined up after the item being shown to the active user, so you can watch how the feed changes after each interaction.</p>
+      <p class="muted">The first row is the item currently being shown to the active user. The rows below are queued next. Watch this update live after each interaction.</p>
       <div class="scroll">
         <table id="currentFeedTable">
           <thead>
             <tr>
               <th>#</th>
+              <th>Status</th>
               <th>Preview</th>
               <th>Item ID</th>
               <th>Title</th>
@@ -498,11 +420,7 @@
           <h3>Liked Items</h3>
           <div class="scroll">
             <table id="likedTable">
-              <thead>
-                <tr>
-                  <th>Item ID</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Item ID</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -513,11 +431,7 @@
           <h3>Skipped Items</h3>
           <div class="scroll">
             <table id="skippedTable">
-              <thead>
-                <tr>
-                  <th>Item ID</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Item ID</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -558,27 +472,22 @@
     function setStatus(message, mode = "loading") {
       const el = document.getElementById("currentUserStatus");
       el.textContent = message || "";
-
-      if (mode === "error") {
-        el.className = "status error";
-      } else if (mode === "ok") {
-        el.className = "status ok";
-      } else {
-        el.className = "status loading";
-      }
+      if (mode === "error") el.className = "status error";
+      else if (mode === "ok") el.className = "status ok";
+      else el.className = "status loading";
     }
 
     function clearTableBody(tableId) {
       document.querySelector(`#${tableId} tbody`).innerHTML = "";
     }
 
-    function addRow(tableId, cells, renderAsCode = false) {
+    function addRow(tableId, cells, renderAsCode = false, rowClass = null) {
       const tbody = document.querySelector(`#${tableId} tbody`);
       const tr = document.createElement("tr");
+      if (rowClass) tr.className = rowClass;
 
       cells.forEach(cell => {
         const td = document.createElement("td");
-
         if (cell instanceof HTMLElement) {
           td.appendChild(cell);
         } else if (renderAsCode && typeof cell === "string") {
@@ -588,7 +497,6 @@
         } else {
           td.textContent = cell ?? "";
         }
-
         tr.appendChild(td);
       });
 
@@ -611,8 +519,7 @@
 
     function formatTimestamp(ts) {
       if (!ts) return "";
-      const date = new Date(ts * 1000);
-      return date.toLocaleString();
+      return new Date(ts * 1000).toLocaleString();
     }
 
     function createThumb(path, title) {
@@ -622,10 +529,26 @@
       img.alt = title || "Preview image";
       img.loading = "lazy";
       img.referrerPolicy = "no-referrer";
-      img.onerror = () => {
-        img.style.display = "none";
-      };
+      img.onerror = () => { img.style.display = "none"; };
       return img;
+    }
+
+    function createActiveBadge() {
+      const badge = document.createElement("span");
+      badge.className = "active-badge";
+      const dot = document.createElement("span");
+      dot.className = "dot-active";
+      badge.appendChild(dot);
+      badge.appendChild(document.createTextNode(" Active"));
+      return badge;
+    }
+
+    function createNextLabel(position) {
+      const span = document.createElement("span");
+      span.className = "muted";
+      span.style.fontSize = "12px";
+      span.textContent = `Next ${position - 1}`;
+      return span;
     }
 
     function setSummary(data) {
@@ -654,9 +577,7 @@
       const hasUser = Boolean(data?.active_user);
 
       document.getElementById("fortunePreviewText").textContent =
-        hasUser
-          ? (data?.fortune_preview || "No preview fortune available.")
-          : "No active user right now.";
+        hasUser ? (data?.fortune_preview || "No preview fortune available.") : "No active user right now.";
 
       document.getElementById("fortuneSegment").textContent =
         hasUser ? (data?.fortune_segment || "—") : "—";
@@ -692,7 +613,6 @@
 
     async function fetchJson(url) {
       const res = await fetch(url, { cache: "no-store" });
-
       let body = null;
       const contentType = res.headers.get("content-type") || "";
       if (contentType.includes("application/json")) {
@@ -700,7 +620,6 @@
       } else {
         body = await res.text();
       }
-
       if (!res.ok) {
         const detail =
           typeof body === "object" && body !== null
@@ -708,7 +627,6 @@
             : String(body || res.statusText || "Request failed");
         throw new Error(`HTTP ${res.status}: ${detail}`);
       }
-
       return body;
     }
 
@@ -722,8 +640,18 @@
 
     function renderCurrentFeed(items) {
       if ((items || []).length) {
-        items.forEach((item, index) => {
+        items.forEach((item) => {
+          const isActive = item.is_active === true;
+          const position = item.position ?? (items.indexOf(item) + 1);
+
           const thumb = createThumb(item.path, item.title || item.item_id);
+
+          const statusCell = document.createElement("div");
+          if (isActive) {
+            statusCell.appendChild(createActiveBadge());
+          } else {
+            statusCell.appendChild(createNextLabel(position));
+          }
 
           const titleWrap = document.createElement("div");
           titleWrap.className = "title-cell";
@@ -731,20 +659,16 @@
 
           const pathCode = document.createElement("code");
           pathCode.textContent = item.path || "";
-
           const pathWrap = document.createElement("div");
           pathWrap.className = "path-cell";
           pathWrap.appendChild(pathCode);
 
-          addRow("currentFeedTable", [
-            index + 1,
-            thumb,
-            item.item_id || "",
-            titleWrap,
-            formatScore(item.score),
-            item.row_idx ?? "—",
-            pathWrap
-          ]);
+          addRow(
+            "currentFeedTable",
+            [position, statusCell, thumb, item.item_id || "", titleWrap, formatScore(item.score), item.row_idx ?? "—", pathWrap],
+            false,
+            isActive ? "active-row" : null
+          );
         });
       } else {
         setEmptyState("currentFeedEmpty", true);
@@ -803,13 +727,7 @@
           const actionPill = document.createElement("span");
           actionPill.className = `pill ${entry.action === "like" ? "like" : "skip"}`;
           actionPill.textContent = entry.action;
-
-          addRow("historyTable", [
-            index + 1,
-            entry.item_id,
-            actionPill,
-            formatTimestamp(entry.ts)
-          ], false);
+          addRow("historyTable", [index + 1, entry.item_id, actionPill, formatTimestamp(entry.ts)], false);
         });
       } else {
         setEmptyState("historyEmpty", true);
@@ -820,10 +738,8 @@
 
     async function loadCurrentUser() {
       if (refreshInFlight) return;
-
       refreshInFlight = true;
       setStatus("Loading current active user...");
-
       try {
         const data = await fetchJson(`${API}/admin/current-user`);
         renderCurrentUser(data);
@@ -847,9 +763,7 @@
     function startPolling() {
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(() => {
-        if (!pollingPaused) {
-          loadCurrentUser();
-        }
+        if (!pollingPaused) loadCurrentUser();
       }, REFRESH_MS);
     }
 
@@ -861,9 +775,7 @@
       pollingPaused = !pollingPaused;
       e.currentTarget.textContent = pollingPaused ? "Resume auto-refresh" : "Pause auto-refresh";
       setStatus(
-        pollingPaused
-          ? "Auto-refresh paused."
-          : "Auto-refresh resumed.",
+        pollingPaused ? "Auto-refresh paused." : "Auto-refresh resumed.",
         pollingPaused ? "loading" : "ok"
       );
     });

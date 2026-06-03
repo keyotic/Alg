@@ -4,56 +4,79 @@ import { useSwipeable } from "react-swipeable";
 import HeartIcon from "../public/assets/img/LikeLogo.svg";
 import SkipIcon from "../public/assets/img/SkipLogo.svg";
 
+
 const API = import.meta.env.DEV
   ? "http://localhost:8000"
   : "https://alg-backend.onrender.com";
 
+
 const existingUserId = sessionStorage.getItem("user_id");
 const USER_ID = existingUserId || `user-${crypto.randomUUID()}`;
+
 
 if (!existingUserId) {
   sessionStorage.setItem("user_id", USER_ID);
 }
 
+
+// Tells the backend exactly which item is now on screen.
+// Fire-and-forget — no await needed, never blocks the UI.
+const reportAdvance = (itemId) => {
+  axios
+    .post(`${API}/advance`, { user_id: USER_ID, item_id: itemId })
+    .catch(() => {}); // silently ignore network errors
+};
+
+
 function Card({ item, onLike, onSkip }) {
   const [dragX, setDragX] = useState(0);
   const [exitDir, setExitDir] = useState(null);
 
+
   const handlers = useSwipeable({
     onSwiping: ({ deltaX }) => setDragX(deltaX),
+
 
     onSwipedLeft: () => {
       setExitDir("left");
       setTimeout(() => onSkip(item), 220);
     },
 
+
     onSwipedRight: () => {
       setExitDir("right");
       setTimeout(() => onLike(item), 220);
     },
 
+
     onSwiped: () => {
       if (!exitDir) setDragX(0);
     },
 
+
     trackMouse: true,
     preventScrollOnSwipe: true,
   });
+
 
   useEffect(() => {
     setDragX(0);
     setExitDir(null);
   }, [item?.item_id || item?.title || item]);
 
+
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const maxGrow = 0.2;
   const intensity = 220;
 
+
   const likeScale =
     dragX > 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
+
   const skipScale =
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
+
 
   return (
     <div style={{ width: 1034, overflow: "hidden", marginLeft: "-61em" }}>
@@ -83,6 +106,7 @@ function Card({ item, onLike, onSkip }) {
           }}
         />
 
+
         <div style={{ padding: 12 }}>
           <div
             style={{
@@ -96,6 +120,7 @@ function Card({ item, onLike, onSkip }) {
           </div>
         </div>
       </div>
+
 
       <div
         style={{
@@ -136,6 +161,7 @@ function Card({ item, onLike, onSkip }) {
           />
         </button>
 
+
         <button
           style={{
             width: 300,
@@ -171,6 +197,7 @@ function Card({ item, onLike, onSkip }) {
   );
 }
 
+
 export default function App() {
   const [queue, setQueue] = useState([]);
   const [interactionCount, setInteractionCount] = useState(0);
@@ -179,16 +206,19 @@ export default function App() {
   const hasFinishedRef = useRef(false);
   const isInternalNavigationRef = useRef(false);
 
+
   const maxInteractions = 20;
   const progressPercent = Math.min(
     (interactionCount / maxInteractions) * 100,
     100
   );
 
+
   const fetchFeed = async () => {
     try {
       setLoading(true);
       setError("");
+
 
       const res = await axios.post(`${API}/feed`, {
         user_id: USER_ID,
@@ -196,7 +226,14 @@ export default function App() {
         exclude_seen: true,
       });
 
-      setQueue(res.data.items || []);
+
+      const items = res.data.items || [];
+      setQueue(items);
+
+      // Tell the backend which item is now on screen (the first one in the new batch).
+      if (items.length > 0) {
+        reportAdvance(items[0].item_id);
+      }
     } catch (err) {
       console.error("Feed failed:", err);
       setError("Could not load images. Please refresh or try again.");
@@ -204,6 +241,7 @@ export default function App() {
       setLoading(false);
     }
   };
+
 
   const sendInteraction = async (item, action) => {
     try {
@@ -217,6 +255,7 @@ export default function App() {
     }
   };
 
+
   const resetSession = async () => {
     try {
       await axios.post(`${API}/reset`, {
@@ -227,18 +266,31 @@ export default function App() {
     }
   };
 
+
   const goToNextPage = async () => {
     hasFinishedRef.current = true;
     isInternalNavigationRef.current = true;
     window.location.href = `${import.meta.env.BASE_URL}end1.html`;
   };
 
+
   const handleInteraction = (item, action) => {
-    setQueue((q) => q.slice(1));
+    // Remove the swiped item and tell the backend what's now on screen.
+    setQueue((q) => {
+      const next = q.slice(1);
+      // next[0] is the item that will appear on screen after this swipe.
+      if (next.length > 0) {
+        reportAdvance(next[0].item_id);
+      }
+      return next;
+    });
+
     sendInteraction(item, action);
+
 
     setInteractionCount((prev) => {
       const next = prev + 1;
+
 
       if (next >= maxInteractions) {
         setTimeout(() => {
@@ -246,16 +298,20 @@ export default function App() {
         }, 250);
       }
 
+
       return next;
     });
   };
 
+
   const onLike = (item) => handleInteraction(item, "like");
   const onSkip = (item) => handleInteraction(item, "skip");
+
 
   useEffect(() => {
     fetchFeed();
   }, []);
+
 
   useEffect(() => {
     if (!loading && !error && queue.length < 5 && interactionCount < maxInteractions) {
@@ -263,9 +319,11 @@ export default function App() {
     }
   }, [queue.length, loading, error, interactionCount]);
 
+
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (hasFinishedRef.current || isInternalNavigationRef.current) return;
+
 
       const data = JSON.stringify({ user_id: USER_ID });
       navigator.sendBeacon(
@@ -274,12 +332,15 @@ export default function App() {
       );
     };
 
+
     window.addEventListener("beforeunload", handleBeforeUnload);
+
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
+
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
@@ -298,6 +359,7 @@ export default function App() {
             onLike={onLike}
             onSkip={onSkip}
           />
+
 
           <div
             style={{
