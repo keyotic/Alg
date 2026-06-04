@@ -3,7 +3,7 @@ import traceback
 import numpy as np
 import faiss
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
@@ -135,8 +135,8 @@ async def catch_exceptions(request: Request, call_next):
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://keyotic.github.io"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -584,34 +584,26 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 
 
 def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
-    # Read from the stored live batch so the admin view matches the frontend exactly.
-    # Returns [] if the user hasn't called /feed yet (nothing to show before first load).
     stored_feed = USER_CURRENT_FEED.get(uid)
-
 
     if not stored_feed:
         return []
 
-
     current_idx = USER_FEED_INDEX.get(uid, 0)
-
 
     if include_active:
         feed_slice = stored_feed[current_idx:]
     else:
         feed_slice = stored_feed[current_idx + 1:]
 
-
     feed_slice = feed_slice[:limit]
-
 
     annotated = []
     for i, item in enumerate(feed_slice):
         item = item.copy()
-        item["position"] = current_idx + i + 1  # absolute position in the full batch
+        item["position"] = current_idx + i + 1
         item["is_active"] = (i == 0)
         annotated.append(item)
-
 
     return annotated
 
@@ -622,17 +614,13 @@ def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = Tr
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
-        # Build with include_debug=True so we can store score/row_idx for the admin preview.
         items = build_feed_items(
             uid=req.user_id,
             limit=req.limit,
             exclude_seen=req.exclude_seen,
             include_debug=True
         )
-        # Store the live batch. Do NOT reset the pointer here — /advance will set it
-        # to the exact item the frontend is showing first.
         USER_CURRENT_FEED[req.user_id] = items
-        # Strip debug fields before returning to the frontend — no behaviour change for clients.
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         return {"items": clean}
     except Exception as e:
@@ -644,13 +632,7 @@ def feed(req: FeedRequest):
 
 @app.post("/advance")
 def advance(req: Advance):
-    """
-    Called by the frontend immediately after it displays a new item (on first load
-    and after every swipe). Tells the backend exactly which item_id is now on screen
-    so the admin preview stays perfectly in sync regardless of batch ordering.
-    """
     mark_active(req.user_id)
-
 
     stored_feed = USER_CURRENT_FEED.get(req.user_id, [])
     for i, item in enumerate(stored_feed):
@@ -658,8 +640,6 @@ def advance(req: Advance):
             USER_FEED_INDEX[req.user_id] = i
             return {"ok": True}
 
-
-    # item_id not found in current batch — pointer stays where it is
     return {"ok": True}
 
 
@@ -877,15 +857,25 @@ def admin_preview_feed(user_id: str, limit: int = 15):
 
 
 
-@app.get("/admin/feed.csv", response_class=PlainTextResponse)
+@app.get("/admin/feed.csv")
 def admin_feed_csv():
     if not LAST_ACTIVE_USER:
-        return "#,status,item_id,title\n"
-    items = get_current_feed_preview(LAST_ACTIVE_USER, limit=15, include_active=True)
-    lines = ["#,status,item_id,title"]
-    for item in items:
-        status  = "ACTIVE" if item.get("is_active") else f"next {(item.get('position', 1) - 1)}"
-        item_id = str(item.get("item_id", "")).replace('"', '""')
-        title   = str(item.get("title",   "")).replace('"', '""')
-        lines.append(f'{item.get("position", "")},{status},"{item_id}","{title}"')
-    return "\n".join(lines)
+        content = "#,status,item_id,title\n"
+    else:
+        items = get_current_feed_preview(LAST_ACTIVE_USER, limit=15, include_active=True)
+        lines = ["#,status,item_id,title"]
+        for item in items:
+            status  = "ACTIVE" if item.get("is_active") else f"next {(item.get('position', 1) - 1)}"
+            item_id = str(item.get("item_id", "")).replace('"', '""')
+            title   = str(item.get("title",   "")).replace('"', '""')
+            lines.append(f'{item.get("position", "")},{status},"{item_id}","{title}"')
+        content = "\n".join(lines)
+    return Response(
+        content=content,
+        media_type="text/plain",
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
