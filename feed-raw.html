@@ -2,99 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Current Feed</title>
+  <title>feed.csv</title>
   <style>
-    body {
-      font-family: monospace;
-      font-size: 13px;
-      background: #fff;
-      color: #000;
-      padding: 12px;
-      margin: 0;
-    }
-
-    p { margin: 0 0 6px; }
-
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-top: 8px;
-    }
-
-    th, td {
-      border: 1px solid #000;
-      padding: 4px 8px;
-      text-align: left;
-      white-space: nowrap;
-    }
-
-    th { background: #ddd; font-weight: bold; }
-
-    tr.active { background: #cfc; }
+    body { font-family: monospace; font-size: 13px; background: #fff; color: #000; padding: 10px; margin: 0; }
+    pre { white-space: pre; margin: 0; }
+    button { font-family: monospace; font-size: 13px; margin-bottom: 8px; cursor: pointer; padding: 3px 10px; }
+    #meta { margin-bottom: 6px; }
   </style>
 </head>
 <body>
 
-  <p><strong>Current Feed</strong> — live · refreshes every 2s</p>
-  <p>User: <span id="user">—</span> &nbsp;|&nbsp; Seen: <span id="seen">0</span> &nbsp;|&nbsp; Likes: <span id="likes">0</span> &nbsp;|&nbsp; Skips: <span id="skips">0</span> &nbsp;|&nbsp; Last refresh: <span id="ts">—</span></p>
+<div id="meta">user=— | seen=0 | likes=0 | skips=0 | refreshed=—</div>
+<button onclick="downloadCSV()">⬇ Download .csv</button>
+<pre id="csv">Loading…</pre>
 
-  <table id="feedTable">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Status</th>
-        <th>Item ID</th>
-        <th>Title</th>
-      </tr>
-    </thead>
-    <tbody id="feedBody">
-      <tr><td colspan="4">Waiting for data…</td></tr>
-    </tbody>
-  </table>
+<script>
+  const API = "https://alg-backend.onrender.com";
+  let lastItems = [];
 
-  <script>
-    const API = "https://alg-backend.onrender.com";
-    let paused = false;
+  function toCSV(items) {
+    const header = "#,status,item_id,title";
+    const rows = items.map(item =>
+      [
+        item.position ?? "",
+        item.is_active ? "ACTIVE" : "next " + ((item.position ?? 1) - 1),
+        '"' + (item.item_id || "").replace(/"/g, '""') + '"',
+        '"' + (item.title   || "").replace(/"/g, '""') + '"'
+      ].join(",")
+    );
+    return [header, ...rows].join("\n");
+  }
 
-    async function load() {
-      try {
-        const res = await fetch(API + "/admin/current-user", { cache: "no-store" });
-        const data = await res.json();
+  async function load() {
+    try {
+      const res = await fetch(API + "/admin/current-user", { cache: "no-store" });
+      const data = await res.json();
 
-        document.getElementById("user").textContent  = data.active_user  || "—";
-        document.getElementById("seen").textContent  = data.total_seen   ?? 0;
-        document.getElementById("likes").textContent = data.liked_count  ?? 0;
-        document.getElementById("skips").textContent = data.skipped_count ?? 0;
-        document.getElementById("ts").textContent    = new Date().toLocaleTimeString();
+      document.getElementById("meta").textContent =
+        "user=" + (data.active_user || "—") +
+        " | seen=" + (data.total_seen ?? 0) +
+        " | likes=" + (data.liked_count ?? 0) +
+        " | skips=" + (data.skipped_count ?? 0) +
+        " | refreshed=" + new Date().toLocaleTimeString();
 
-        const tbody = document.getElementById("feedBody");
-        tbody.innerHTML = "";
-
-        const items = data.current_feed || [];
-        if (!items.length) {
-          tbody.innerHTML = "<tr><td colspan='4'>No items in queue.</td></tr>";
-          return;
-        }
-
-        items.forEach(item => {
-          const tr = document.createElement("tr");
-          if (item.is_active) tr.className = "active";
-          tr.innerHTML =
-            "<td>" + (item.position ?? "") + "</td>" +
-            "<td>" + (item.is_active ? "ACTIVE" : "next " + ((item.position ?? 1) - 1)) + "</td>" +
-            "<td>" + (item.item_id  || "") + "</td>" +
-            "<td>" + (item.title    || "") + "</td>";
-          tbody.appendChild(tr);
-        });
-      } catch (e) {
-        document.getElementById("feedBody").innerHTML =
-          "<tr><td colspan='4'>Error: " + e.message + "</td></tr>";
-      }
+      lastItems = data.current_feed || [];
+      document.getElementById("csv").textContent =
+        lastItems.length ? toCSV(lastItems) : "No items in queue.";
+    } catch (e) {
+      document.getElementById("csv").textContent = "Error: " + e.message;
     }
+  }
 
-    setInterval(() => { if (!paused) load(); }, 2000);
-    load();
-  </script>
+  function downloadCSV() {
+    if (!lastItems.length) return;
+    const blob = new Blob([toCSV(lastItems)], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "current-feed.csv";
+    a.click();
+  }
+
+  setInterval(load, 2000);
+  load();
+</script>
 </body>
 </html>
