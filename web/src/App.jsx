@@ -107,18 +107,7 @@ function Card({ item, onLike, onSkip }) {
         />
 
 
-        <div style={{ padding: 12 }}>
-          <div
-            style={{
-              fontWeight: 600,
-              fontSize: 24,
-              textAlign: "center",
-              color: "#213547",
-            }}
-          >
-            {item.title || item.item_id}
-          </div>
-        </div>
+       
       </div>
 
 
