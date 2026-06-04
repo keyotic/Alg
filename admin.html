@@ -640,7 +640,6 @@
           const isActive = item.is_active === true;
           const position = item.position ?? (items.indexOf(item) + 1);
 
-          const thumb = createThumb(item.path, item.title || item.item_id);
 
           const statusCell = document.createElement("div");
           if (isActive) {
@@ -661,10 +660,10 @@
 
           addRow(
             "currentFeedTable",
-            [position, statusCell, thumb, item.item_id || "", titleWrap, formatScore(item.score), item.row_idx ?? "—", pathWrap],
-            false,
-            isActive ? "active-row" : null
-          );
+           [position, statusCell, item.item_id || "", titleWrap, formatScore(item.score), item.row_idx ?? "—", pathWrap],
+           false,
+           isActive ? "active-row" : null
+        );
         });
       } else {
         setEmptyState("currentFeedEmpty", true);
