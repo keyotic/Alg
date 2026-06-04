@@ -267,8 +267,6 @@
       background: #f3f6fb;
     }
 
-    .title-cell { min-width: 220px; }
-    .path-cell { min-width: 260px; word-break: break-all; }
 
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
@@ -652,18 +650,14 @@
           titleWrap.className = "title-cell";
           titleWrap.textContent = item.title || "—";
 
-          const pathCode = document.createElement("code");
-          pathCode.textContent = item.path || "";
-          const pathWrap = document.createElement("div");
-          pathWrap.className = "path-cell";
-          pathWrap.appendChild(pathCode);
+          
 
           addRow(
             "currentFeedTable",
-           [position, statusCell, item.item_id || "", titleWrap, formatScore(item.score), item.row_idx ?? "—", pathWrap],
-           false,
-           isActive ? "active-row" : null
-        );
+            [position, statusCell, item.item_id || "", titleWrap],
+            false,
+            isActive ? "active-row" : null
+          );
         });
       } else {
         setEmptyState("currentFeedEmpty", true);
