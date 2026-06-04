@@ -872,7 +872,7 @@ def admin_feed_csv():
         content = "\n".join(lines)
     return Response(
         content=content,
-        media_type="text/plain",
+        media_type="text/csv",
         headers={
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
