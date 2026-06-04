@@ -877,5 +877,6 @@ def admin_feed_csv():
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
             "Access-Control-Allow-Headers": "*",
+            "Refresh": "2",
         }
     )
