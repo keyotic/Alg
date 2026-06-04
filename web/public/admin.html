@@ -267,8 +267,6 @@
       background: #f3f6fb;
     }
 
-    .title-cell { min-width: 220px; }
-    .path-cell { min-width: 260px; word-break: break-all; }
 
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
@@ -380,12 +378,8 @@
             <tr>
               <th>#</th>
               <th>Status</th>
-              <th>Preview</th>
               <th>Item ID</th>
               <th>Title</th>
-              <th>Score</th>
-              <th>Row Index</th>
-              <th>Path</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -644,7 +638,6 @@
           const isActive = item.is_active === true;
           const position = item.position ?? (items.indexOf(item) + 1);
 
-          const thumb = createThumb(item.path, item.title || item.item_id);
 
           const statusCell = document.createElement("div");
           if (isActive) {
@@ -657,15 +650,11 @@
           titleWrap.className = "title-cell";
           titleWrap.textContent = item.title || "—";
 
-          const pathCode = document.createElement("code");
-          pathCode.textContent = item.path || "";
-          const pathWrap = document.createElement("div");
-          pathWrap.className = "path-cell";
-          pathWrap.appendChild(pathCode);
+          
 
           addRow(
             "currentFeedTable",
-            [position, statusCell, thumb, item.item_id || "", titleWrap, formatScore(item.score), item.row_idx ?? "—", pathWrap],
+            [position, statusCell, item.item_id || "", titleWrap],
             false,
             isActive ? "active-row" : null
           );
