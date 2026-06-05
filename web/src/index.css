@@ -183,8 +183,8 @@ button:focus-visible {
     justify-content: center;
     align-items: center;
     text-align: left;
-    width: 600px;
-    height: 70px;
+    width: 661px;
+    height: 90px;
     font-size: 30pt;
     font-weight: bold;
     font-family: mr-eaves-xl-modern, sans-serif;
@@ -195,7 +195,8 @@ button:focus-visible {
     border-width: 5px;
     border-color: #fff;
     border-style: solid;
-    margin-top: 540px;
+    margin-top: 750px;
+    margin-left: -511px;
 }
 
 .name-arrow{
@@ -204,7 +205,8 @@ button:focus-visible {
     align-items: center;
     text-align: center;
     background-color: #00000000;
-    margin-left: -5em;
+    margin-left: 47px;
+    margin-top: -100px;
 }
 
 .titleswipe{
