@@ -39,7 +39,7 @@ body{
     min-height: 105vh;
     background-color: #000000;
     background-image: url('../public/assets/img/Rectangle3803.png'), url('../public/assets/img/AlgoracleVisual.gif') ;
-    background-size: cover, 200%;
+    background-size: cover, 140%;
     background-repeat: no-repeat, no-repeat;
     background-position: 50% 50%, 50% 1%; 
 
