@@ -177,16 +177,6 @@ button:focus-visible {
     margin-top: 68em;
 }
 
-.namefield{
-    padding: 75px 50px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 540px;
-    margin-left: 10em;
-    background-color: #000000c9;
-    border-radius: 55px;
-}
 
 .name-input{
     display: flex;
@@ -198,26 +188,22 @@ button:focus-visible {
     font-size: 30pt;
     font-weight: bold;
     font-family: mr-eaves-xl-modern, sans-serif;
-    background-color: #000;
+    background-color: #000000c9;
     color: #ffffff;
     border-radius: 35px;
     text-indent: 32px;
     border-width: 5px;
     border-color: #fff;
     border-style: solid;
+    margin-top: 540px;
 }
 
 .name-arrow{
-    width: 60px;
-    height: 45px;
-    border-radius: 19px;
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: center;
     background-color: #00000000;
-    border: 4px solid #FFF;
-    color: #ffffff;
     margin-left: -5em;
 }
 
