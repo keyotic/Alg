@@ -148,6 +148,7 @@ button:focus-visible {
     justify-content: center;
     align-items: center;
     text-align: center;
+    background-color: #00000000;
     margin-left: 13em;
     margin-top: 68em;
 }
