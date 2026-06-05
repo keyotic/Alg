@@ -133,6 +133,23 @@ button:focus-visible {
 
 
 }
+
+.introtext2{
+   margin-top: 18em;
+   margin-left: 2.5em;
+   width: 825px;
+   height: 180px;
+   font-size : 30pt;
+   font-weight: bold;
+   font-family: mr-eaves-xl-modern, sans-serif;
+   color : #FFF;
+   text-align: center;
+   line-height: 43pt;
+
+
+}
+
+
 .Algoracle{
     font-size : 24pt;
     font-family: Cesso, sans-serif;
