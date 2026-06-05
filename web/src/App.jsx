@@ -353,10 +353,10 @@ export default function App() {
           <div
             style={{
               position: "fixed",
-              bottom: "2rem",
+              bottom: -10,
               left: "50%",
               transform: "translateX(-50%)",
-              width: "420px",
+              width: 1046,
               zIndex: 1000,
             }}
           >
@@ -368,14 +368,11 @@ export default function App() {
               aria-valuenow={interactionCount}
               style={{
                 width: "100%",
-                height: 12,
-                backgroundColor: "#000000",
-                borderRadius: 999,
+                height: 24,
+                backgroundColor: "#00000000",
                 overflow: "hidden",
                 border: "5px solid #ffffff",
-                padding: 25,
                 marginTop: "-8em",
-                marginLeft: "-2em",
               }}
             >
               <div
