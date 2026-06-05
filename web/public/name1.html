@@ -14,13 +14,20 @@
         <p class="introtext" id="introText">But before we start... Tell me your name.</p>
     </div>
 
-    <div>
-        <button onclick="goNextPage()" class="arrow">
+    <div class="namefield">        
+        <input  class="name-input" type="text" id="username" placeholder="Name" maxlength="12" />
+
+        <button onclick="goNext()" class="name-arrow">
             <img src="assets/img/Arrow.svg" alt="ENTER">
         </button>
     </div>
 
     <script>
+          function goNext() {
+             const name = document.getElementById("username").value;
+             window.location.href = "final_intro.html?name=" + encodeURIComponent(name);
+            }
+
         const synth = window.speechSynthesis;
         let voices = [];
         let hasStarted = false;

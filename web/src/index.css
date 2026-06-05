@@ -168,16 +168,11 @@ button:focus-visible {
 }
 
 .finarrow{
-    width: 60px;
-    height: 45px;
-    border-radius: 19px;
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: center;
     background-color: #00000000;
-    border: 4px solid #FFF;
-    color: #ffffff;
     margin-left: 27em;
     margin-top: 68em;
 }
