@@ -19,24 +19,33 @@ const reportAdvance = (itemId) => {
   axios.post(`${API}/advance`, { user_id: USER_ID, item_id: itemId }).catch(() => {});
 };
 
-function Card({ item, onSwipeLeft, onSwipeRight, isTop = true }) {
+function Card({ item, onSwipeLeft, onSwipeRight, isTop = true, onDragChange }) {
   const [dragX, setDragX] = useState(0);
   const [exitDir, setExitDir] = useState(null);
 
   const handlers = useSwipeable({
-    onSwiping: ({ deltaX }) => setDragX(deltaX),
+    onSwiping: ({ deltaX }) => {
+      if (!isTop) return;
+      setDragX(deltaX);
+      onDragChange?.(deltaX);
+    },
     onSwipedLeft: () => {
       if (!isTop) return;
       setExitDir("left");
+      onDragChange?.(0);
       setTimeout(() => onSwipeLeft(item), 220);
     },
     onSwipedRight: () => {
       if (!isTop) return;
       setExitDir("right");
+      onDragChange?.(0);
       setTimeout(() => onSwipeRight(item), 220);
     },
     onSwiped: () => {
-      if (!exitDir) setDragX(0);
+      if (!exitDir) {
+        setDragX(0);
+        onDragChange?.(0);
+      }
     },
     trackMouse: true,
     preventScrollOnSwipe: true,
@@ -45,6 +54,7 @@ function Card({ item, onSwipeLeft, onSwipeRight, isTop = true }) {
   useEffect(() => {
     setDragX(0);
     setExitDir(null);
+    onDragChange?.(0);
   }, [item?.item_id || item?.title || item]);
 
   return (
@@ -81,7 +91,17 @@ function Card({ item, onSwipeLeft, onSwipeRight, isTop = true }) {
   );
 }
 
-function ActionButtons({ onSkip, onLike, disabled = false }) {
+function ActionButtons({ onSkip, onLike, dragX = 0, disabled = false }) {
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  const maxGrow = 0.2;
+  const intensity = 220;
+
+  const likeScale =
+    dragX > 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
+
+  const skipScale =
+    dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
+
   return (
     <div
       style={{
@@ -105,6 +125,8 @@ function ActionButtons({ onSkip, onLike, disabled = false }) {
           borderColor: "#ffffff",
           border: "5px solid #ffffff",
           borderRadius: "25px",
+          transform: `scale(${skipScale})`,
+          transition: "transform 120ms ease-out",
           backgroundColor: "#000000",
         }}
         onClick={onSkip}
@@ -113,7 +135,12 @@ function ActionButtons({ onSkip, onLike, disabled = false }) {
         <img
           src={SkipIcon}
           alt="Skip"
-          style={{ width: 55, height: 55 }}
+          style={{
+            width: 55,
+            height: 55,
+            transform: `scale(${skipScale})`,
+            transition: "transform 120ms ease-out",
+          }}
         />
       </button>
 
@@ -130,6 +157,8 @@ function ActionButtons({ onSkip, onLike, disabled = false }) {
           borderColor: "#ffffff",
           border: "5px solid #ffffff",
           borderRadius: "25px",
+          transform: `scale(${likeScale})`,
+          transition: "transform 120ms ease-out",
           backgroundColor: "#000000",
         }}
         onClick={onLike}
@@ -138,7 +167,12 @@ function ActionButtons({ onSkip, onLike, disabled = false }) {
         <img
           src={HeartIcon}
           alt="Like"
-          style={{ width: 55, height: 55 }}
+          style={{
+            width: 55,
+            height: 55,
+            transform: `scale(${likeScale})`,
+            transition: "transform 120ms ease-out",
+          }}
         />
       </button>
     </div>
@@ -150,6 +184,7 @@ export default function App() {
   const [interactionCount, setInteractionCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dragX, setDragX] = useState(0);
   const hasFinishedRef = useRef(false);
   const isInternalNavigationRef = useRef(false);
 
@@ -285,6 +320,7 @@ export default function App() {
                     onSwipeLeft={onSkip}
                     onSwipeRight={onLike}
                     isTop={isTop}
+                    onDragChange={setDragX}
                   />
                 </div>
               );
@@ -294,6 +330,7 @@ export default function App() {
           <ActionButtons
             onSkip={() => onSkip(queue[0])}
             onLike={() => onLike(queue[0])}
+            dragX={dragX}
             disabled={!queue.length}
           />
 
