@@ -16,12 +16,10 @@ if (!existingUserId) {
 }
 
 const reportAdvance = (itemId) => {
-  axios
-    .post(`${API}/advance`, { user_id: USER_ID, item_id: itemId })
-    .catch(() => {});
+  axios.post(`${API}/advance`, { user_id: USER_ID, item_id: itemId }).catch(() => {});
 };
 
-function Card({ item, onLike, onSkip, isTop = true }) {
+function Card({ item, onSwipeLeft, onSwipeRight, isTop = true }) {
   const [dragX, setDragX] = useState(0);
   const [exitDir, setExitDir] = useState(null);
 
@@ -30,12 +28,12 @@ function Card({ item, onLike, onSkip, isTop = true }) {
     onSwipedLeft: () => {
       if (!isTop) return;
       setExitDir("left");
-      setTimeout(() => onSkip(item), 220);
+      setTimeout(() => onSwipeLeft(item), 220);
     },
     onSwipedRight: () => {
       if (!isTop) return;
       setExitDir("right");
-      setTimeout(() => onLike(item), 220);
+      setTimeout(() => onSwipeRight(item), 220);
     },
     onSwiped: () => {
       if (!exitDir) setDragX(0);
@@ -48,16 +46,6 @@ function Card({ item, onLike, onSkip, isTop = true }) {
     setDragX(0);
     setExitDir(null);
   }, [item?.item_id || item?.title || item]);
-
-  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-  const maxGrow = 0.2;
-  const intensity = 220;
-
-  const likeScale =
-    dragX > 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
-
-  const skipScale =
-    dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
   return (
     <div style={{ width: 1034, overflow: "hidden", marginLeft: "-61em" }}>
@@ -88,80 +76,71 @@ function Card({ item, onLike, onSkip, isTop = true }) {
             borderRadius: 20,
           }}
         />
-
-        <div
-          style={{
-            padding: 12,
-            display: "flex",
-            gap: 8,
-            justifyContent: "center",
-            marginTop: -10,
-          }}
-        >
-          <button
-            style={{
-              width: 300,
-              height: 85,
-              marginLeft: -80,
-              marginTop: -45,
-              display: "flex",
-              alignItems: "right",
-              justifyContent: "right",
-              borderColor: "#ffffff",
-              border: "5px solid #ffffff",
-              borderRadius: "25px",
-              transform: `scale(${skipScale})`,
-              transition: "transform 120ms ease-out",
-              backgroundColor: "#000000",
-            }}
-            onClick={isTop ? () => onSkip(item) : undefined}
-            disabled={!isTop}
-          >
-            <img
-              src={SkipIcon}
-              alt="Skip"
-              style={{
-                width: 55,
-                height: 55,
-                transform: `scale(${skipScale})`,
-                transition: "transform 120ms ease-out",
-              }}
-            />
-          </button>
-
-          <button
-            style={{
-              width: 300,
-              height: 85,
-              marginRight: -80,
-              marginTop: -40,
-              display: "flex",
-              alignItems: "left",
-              justifyContent: "left",
-              marginLeft: "auto",
-              borderColor: "#ffffff",
-              border: "5px solid #ffffff",
-              borderRadius: "25px",
-              transform: `scale(${likeScale})`,
-              transition: "transform 120ms ease-out",
-              backgroundColor: "#000000",
-            }}
-            onClick={isTop ? () => onLike(item) : undefined}
-            disabled={!isTop}
-          >
-            <img
-              src={HeartIcon}
-              alt="Like"
-              style={{
-                width: 55,
-                height: 55,
-                transform: `scale(${likeScale})`,
-                transition: "transform 120ms ease-out",
-              }}
-            />
-          </button>
-        </div>
       </div>
+    </div>
+  );
+}
+
+function ActionButtons({ onSkip, onLike, disabled = false }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        justifyContent: "center",
+        width: 1034,
+        marginLeft: "-61em",
+        marginTop: -10,
+      }}
+    >
+      <button
+        style={{
+          width: 300,
+          height: 85,
+          marginLeft: -80,
+          marginTop: -45,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderColor: "#ffffff",
+          border: "5px solid #ffffff",
+          borderRadius: "25px",
+          backgroundColor: "#000000",
+        }}
+        onClick={onSkip}
+        disabled={disabled}
+      >
+        <img
+          src={SkipIcon}
+          alt="Skip"
+          style={{ width: 55, height: 55 }}
+        />
+      </button>
+
+      <button
+        style={{
+          width: 300,
+          height: 85,
+          marginRight: -80,
+          marginTop: -40,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginLeft: "auto",
+          borderColor: "#ffffff",
+          border: "5px solid #ffffff",
+          borderRadius: "25px",
+          backgroundColor: "#000000",
+        }}
+        onClick={onLike}
+        disabled={disabled}
+      >
+        <img
+          src={HeartIcon}
+          alt="Like"
+          style={{ width: 55, height: 55 }}
+        />
+      </button>
     </div>
   );
 }
@@ -175,10 +154,7 @@ export default function App() {
   const isInternalNavigationRef = useRef(false);
 
   const maxInteractions = 20;
-  const progressPercent = Math.min(
-    (interactionCount / maxInteractions) * 100,
-    100
-  );
+  const progressPercent = Math.min((interactionCount / maxInteractions) * 100, 100);
 
   const fetchFeed = async () => {
     try {
@@ -217,16 +193,6 @@ export default function App() {
     }
   };
 
-  const resetSession = async () => {
-    try {
-      await axios.post(`${API}/reset`, {
-        user_id: USER_ID,
-      });
-    } catch (err) {
-      console.error("Reset failed:", err);
-    }
-  };
-
   const goToNextPage = async () => {
     hasFinishedRef.current = true;
     isInternalNavigationRef.current = true;
@@ -246,13 +212,11 @@ export default function App() {
 
     setInteractionCount((prev) => {
       const next = prev + 1;
-
       if (next >= maxInteractions) {
         setTimeout(() => {
           goToNextPage();
         }, 250);
       }
-
       return next;
     });
   };
@@ -282,10 +246,7 @@ export default function App() {
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   return (
@@ -310,7 +271,6 @@ export default function App() {
                     position: isTop ? "relative" : "absolute",
                     top: isTop ? "auto" : 0,
                     left: isTop ? "auto" : 0,
-                    right: isTop ? "auto" : 0,
                     zIndex: 100 - index,
                     transform: isTop
                       ? "none"
@@ -322,14 +282,20 @@ export default function App() {
                 >
                   <Card
                     item={item}
-                    onLike={onLike}
-                    onSkip={onSkip}
+                    onSwipeLeft={onSkip}
+                    onSwipeRight={onLike}
                     isTop={isTop}
                   />
                 </div>
               );
             })}
           </div>
+
+          <ActionButtons
+            onSkip={() => onSkip(queue[0])}
+            onLike={() => onLike(queue[0])}
+            disabled={!queue.length}
+          />
 
           <div
             style={{
