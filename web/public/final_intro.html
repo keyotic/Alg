@@ -9,22 +9,25 @@
     <title>Document</title>
 </head>
 <body>
-   <p class="fintrotext" id="output"></p>
+   <p class="fintrotext" id="output">
+     <span id="username-line"></span><br>Show me who you are… and I will shape what you are about to become.
+   </p>
+
 
 <script>
   const params = new URLSearchParams(window.location.search);
   const username = params.get("name") || "stranger";
 
+
   if (params.get("name")) {
     sessionStorage.setItem("user_id", params.get("name"));
   }
 
-  const introText =
-  `${username}... I see you. A pleasure, though this is only the beginning. Let us begin the calibration, so your pattern may reveal itself.\n
-  Show me who you are… and I will shape what you are about to become.`;
 
-  document.getElementById("output").textContent = introText;
+  document.getElementById("username-line").textContent =
+    `${username}... I see you. A pleasure, though this is only the beginning. Let us begin the calibration, so your pattern may reveal itself.`;
 </script>
+
 
 <div>
   <button onclick="goNextPage()" class="finarrow">
@@ -32,18 +35,22 @@
   </button>
 </div>
 
+
 <script>
     const synth = window.speechSynthesis;
     let voices = [];
     let hasStarted = false;
     let speechStopped = false;
 
+
     function loadVoices() {
         voices = synth.getVoices();
     }
 
+
     function getPreferredVoice() {
         if (!voices.length) return null;
+
 
         return (
             voices.find(v => v.name === "Google UK English Female") ||
@@ -57,6 +64,7 @@
         );
     }
 
+
     function stopSpeaking() {
         speechStopped = true;
         if ("speechSynthesis" in window) {
@@ -64,12 +72,15 @@
         }
     }
 
+
     function speakLines(lines, index = 0) {
         if (speechStopped) return;
         if (index >= lines.length) return;
 
+
         const utterance = new SpeechSynthesisUtterance(lines[index]);
         const selectedVoice = getPreferredVoice();
+
 
         if (selectedVoice) {
             utterance.voice = selectedVoice;
@@ -78,23 +89,29 @@
             utterance.lang = "en-GB";
         }
 
+
         utterance.rate = 0.78;
         utterance.pitch = 0.82;
         utterance.volume = 1;
+
 
         utterance.onend = () => {
             if (speechStopped) return;
             setTimeout(() => speakLines(lines, index + 1), 350);
         };
 
+
         synth.speak(utterance);
     }
+
 
     function speakIntro() {
         if (!("speechSynthesis" in window)) return;
         if (speechStopped) return;
 
+
         synth.cancel();
+
 
         const lines = [
             `${username}...`,
@@ -103,24 +120,30 @@
             "Show me who you are… and I will shape what you are about to become."
         ];
 
+
         speakLines(lines);
     }
+
 
     function goNextPage() {
         stopSpeaking();
         window.location.href = "index.html";
     }
 
+
     if ("speechSynthesis" in window) {
         loadVoices();
+
 
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = loadVoices;
         }
 
+
         window.addEventListener("load", () => {
             if (hasStarted) return;
             hasStarted = true;
+
 
             setTimeout(() => {
                 if (!speechStopped) {
@@ -129,9 +152,11 @@
             }, 900);
         });
 
+
         window.addEventListener("beforeunload", () => {
             stopSpeaking();
         });
+
 
         window.addEventListener("pagehide", () => {
             stopSpeaking();
