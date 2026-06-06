@@ -268,3 +268,26 @@ button:focus-visible {
  color : #FFF;
  text-align: center;
 }
+
+.ready{    
+    margin-top: 1135px;
+    margin-left: -460px;
+    width: 550px;
+    height: 60px;
+    border-radius: 19px;
+    display: flex;
+    justify-content: center;
+    align-items: end;
+    text-align: center;
+    background-color: #00000000;
+    border: 6px solid #FFF;
+    font-family: fredoka-variable, sans-serif;
+    font-size: 34px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    color: #ffffff;
+    align-self: bottom, center;
+    
+    
+}
