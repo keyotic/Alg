@@ -4,85 +4,66 @@ import { useSwipeable } from "react-swipeable";
 import HeartIcon from "../public/assets/img/LikeLogo.svg";
 import SkipIcon from "../public/assets/img/SkipLogo.svg";
 
-
 const API = import.meta.env.DEV
   ? "http://localhost:8000"
   : "https://alg-backend.onrender.com";
 
-
 const existingUserId = sessionStorage.getItem("user_id");
 const USER_ID = existingUserId || `user-${crypto.randomUUID()}`;
-
 
 if (!existingUserId) {
   sessionStorage.setItem("user_id", USER_ID);
 }
 
-
-// Tells the backend exactly which item is now on screen.
-// Fire-and-forget — no await needed, never blocks the UI.
 const reportAdvance = (itemId) => {
   axios
     .post(`${API}/advance`, { user_id: USER_ID, item_id: itemId })
-    .catch(() => {}); // silently ignore network errors
+    .catch(() => {});
 };
-
 
 function Card({ item, onLike, onSkip }) {
   const [dragX, setDragX] = useState(0);
   const [exitDir, setExitDir] = useState(null);
 
-
   const handlers = useSwipeable({
     onSwiping: ({ deltaX }) => setDragX(deltaX),
-
-
     onSwipedLeft: () => {
       setExitDir("left");
       setTimeout(() => onSkip(item), 220);
     },
-
-
     onSwipedRight: () => {
       setExitDir("right");
       setTimeout(() => onLike(item), 220);
     },
-
-
     onSwiped: () => {
       if (!exitDir) setDragX(0);
     },
-
-
     trackMouse: true,
     preventScrollOnSwipe: true,
   });
-
 
   useEffect(() => {
     setDragX(0);
     setExitDir(null);
   }, [item?.item_id || item?.title || item]);
 
-
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const maxGrow = 0.2;
   const intensity = 220;
 
-
   const likeScale =
     dragX > 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
-
 
   const skipScale =
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
-
   return (
-    <div style={{ width: 1034, overflow: "hidden", marginLeft: "-61em" }}>
+    <div style={{ width: "100%", height: "100%" }}>
       <div
         {...handlers}
         style={{
+          width: "100%",
+          height: "100%",
           transform:
             exitDir === "left"
               ? "translateX(-160%) rotate(-10deg)"
@@ -106,86 +87,80 @@ function Card({ item, onLike, onSkip }) {
           }}
         />
 
-
-       
-      </div>
-
-
-      <div
-        style={{
-          padding: 12,
-          display: "flex",
-          gap: 8,
-          justifyContent: "center",
-          marginTop: -10,
-        }}
-      >
-        <button
+        <div
           style={{
-            width: 300,
-            height: 85,
-            marginLeft: -80,
-            marginTop: -45,
+            padding: 12,
             display: "flex",
-            alignItems: "right",
-            justifyContent: "right",
-            borderColor: "#ffffff",
-            border: "5px solid #ffffff",
-            borderRadius: "25px",
-            transform: `scale(${skipScale})`,
-            transition: "transform 120ms ease-out",
-            backgroundColor: "#000000",
+            gap: 8,
+            justifyContent: "center",
+            marginTop: -10,
           }}
-          onClick={() => onSkip(item)}
         >
-          <img
-            src={SkipIcon}
-            alt="Skip"
+          <button
             style={{
-              width: 55,
-              height: 55,
+              width: 300,
+              height: 85,
+              marginLeft: -80,
+              marginTop: -45,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderColor: "#ffffff",
+              border: "5px solid #ffffff",
+              borderRadius: "25px",
               transform: `scale(${skipScale})`,
               transition: "transform 120ms ease-out",
+              backgroundColor: "#000000",
             }}
-          />
-        </button>
+            onClick={() => onSkip(item)}
+          >
+            <img
+              src={SkipIcon}
+              alt="Skip"
+              style={{
+                width: 55,
+                height: 55,
+                transform: `scale(${skipScale})`,
+                transition: "transform 120ms ease-out",
+              }}
+            />
+          </button>
 
-
-        <button
-          style={{
-            width: 300,
-            height: 85,
-            marginRight: -80,
-            marginTop: -40,
-            display: "flex",
-            alignItems: "left",
-            justifyContent: "left",
-            marginLeft: "auto",
-            borderColor: "#ffffff",
-            border: "5px solid #ffffff",
-            borderRadius: "25px",
-            transform: `scale(${likeScale})`,
-            transition: "transform 120ms ease-out",
-            backgroundColor: "#000000",
-          }}
-          onClick={() => onLike(item)}
-        >
-          <img
-            src={HeartIcon}
-            alt="Like"
+          <button
             style={{
-              width: 55,
-              height: 55,
+              width: 300,
+              height: 85,
+              marginRight: -80,
+              marginTop: -40,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginLeft: "auto",
+              borderColor: "#ffffff",
+              border: "5px solid #ffffff",
+              borderRadius: "25px",
               transform: `scale(${likeScale})`,
               transition: "transform 120ms ease-out",
+              backgroundColor: "#000000",
             }}
-          />
-        </button>
+            onClick={() => onLike(item)}
+          >
+            <img
+              src={HeartIcon}
+              alt="Like"
+              style={{
+                width: 55,
+                height: 55,
+                transform: `scale(${likeScale})`,
+                transition: "transform 120ms ease-out",
+              }}
+            />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
-
 
 export default function App() {
   const [queue, setQueue] = useState([]);
@@ -195,19 +170,16 @@ export default function App() {
   const hasFinishedRef = useRef(false);
   const isInternalNavigationRef = useRef(false);
 
-
   const maxInteractions = 20;
   const progressPercent = Math.min(
     (interactionCount / maxInteractions) * 100,
     100
   );
 
-
   const fetchFeed = async () => {
     try {
       setLoading(true);
       setError("");
-
 
       const res = await axios.post(`${API}/feed`, {
         user_id: USER_ID,
@@ -215,11 +187,9 @@ export default function App() {
         exclude_seen: true,
       });
 
-
       const items = res.data.items || [];
       setQueue(items);
 
-      // Tell the backend which item is now on screen (the first one in the new batch).
       if (items.length > 0) {
         reportAdvance(items[0].item_id);
       }
@@ -230,7 +200,6 @@ export default function App() {
       setLoading(false);
     }
   };
-
 
   const sendInteraction = async (item, action) => {
     try {
@@ -244,7 +213,6 @@ export default function App() {
     }
   };
 
-
   const resetSession = async () => {
     try {
       await axios.post(`${API}/reset`, {
@@ -255,19 +223,15 @@ export default function App() {
     }
   };
 
-
   const goToNextPage = async () => {
     hasFinishedRef.current = true;
     isInternalNavigationRef.current = true;
     window.location.href = `${import.meta.env.BASE_URL}end1.html`;
   };
 
-
   const handleInteraction = (item, action) => {
-    // Remove the swiped item and tell the backend what's now on screen.
     setQueue((q) => {
       const next = q.slice(1);
-      // next[0] is the item that will appear on screen after this swipe.
       if (next.length > 0) {
         reportAdvance(next[0].item_id);
       }
@@ -276,10 +240,8 @@ export default function App() {
 
     sendInteraction(item, action);
 
-
     setInteractionCount((prev) => {
       const next = prev + 1;
-
 
       if (next >= maxInteractions) {
         setTimeout(() => {
@@ -287,20 +249,16 @@ export default function App() {
         }, 250);
       }
 
-
       return next;
     });
   };
 
-
   const onLike = (item) => handleInteraction(item, "like");
   const onSkip = (item) => handleInteraction(item, "skip");
-
 
   useEffect(() => {
     fetchFeed();
   }, []);
-
 
   useEffect(() => {
     if (!loading && !error && queue.length < 5 && interactionCount < maxInteractions) {
@@ -308,11 +266,9 @@ export default function App() {
     }
   }, [queue.length, loading, error, interactionCount]);
 
-
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (hasFinishedRef.current || isInternalNavigationRef.current) return;
-
 
       const data = JSON.stringify({ user_id: USER_ID });
       navigator.sendBeacon(
@@ -321,15 +277,12 @@ export default function App() {
       );
     };
 
-
     window.addEventListener("beforeunload", handleBeforeUnload);
-
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
-
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
@@ -342,13 +295,37 @@ export default function App() {
         </div>
       ) : queue.length ? (
         <>
-          <Card
-            key={queue[0].item_id}
-            item={queue[0]}
-            onLike={onLike}
-            onSkip={onSkip}
-          />
+          <div
+            style={{
+              position: "relative",
+              width: 1034,
+              height: 1180,
+              margin: "0 auto",
+            }}
+          >
+            {queue.slice(0, 4).map((item, index) => {
+              const isTop = index === 0;
 
+              return (
+                <div
+                  key={item.item_id}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 100 - index,
+                    transform: isTop
+                      ? "translateY(0px) scale(1)"
+                      : `translateY(${index * 18}px) scale(${1 - index * 0.04})`,
+                    opacity: isTop ? 1 : 0.95 - index * 0.12,
+                    pointerEvents: isTop ? "auto" : "none",
+                    transition: "transform 180ms ease, opacity 180ms ease",
+                  }}
+                >
+                  <Card item={item} onLike={onLike} onSkip={onSkip} />
+                </div>
+              );
+            })}
+          </div>
 
           <div
             style={{
