@@ -219,15 +219,15 @@ def get_fortune_state(uid: str):
             "like_ratio": 0.0 if total == 0 else like_count / total,
             "skip_ratio": 0.0 if total == 0 else skip_count / total,
             "pool": [
-                "Your future is still unwritten, but possibility already surrounds you.",
-                "The path ahead is silent now… but something meaningful has begun.",
-                "A hidden opportunity waits for you to make the first move.",
-                "The first sign is subtle… yet it will lead you somewhere rare.",
-                "What feels distant now… will soon draw unexpectedly close.",
-                "A quiet beginning is shaping a far greater destiny.",
-                "Something small is already shifting in your favor.",
-                "The answer has not appeared… but the pattern has begun.",
-                "A new path opens the moment you decide to notice it."
+                "\"Your future is still unwritten, but possibility already surrounds you.\"",
+                "\"The path ahead is silent now… but something meaningful has begun.\"",
+                "\"A hidden opportunity waits for you to make the first move.\"",
+                "\"The first sign is subtle… yet it will lead you somewhere rare.\"",
+                "\"What feels distant now… will soon draw unexpectedly close.\"",
+                "\"A quiet beginning is shaping a far greater destiny.\""
+                "\"Something small is already shifting in your favor.\"",
+                "\"The answer has not appeared… but the pattern has begun.\"",
+                "\"A new path opens the moment you decide to notice it.\""
             ]
         }
 
@@ -245,21 +245,21 @@ def get_fortune_state(uid: str):
             "like_ratio": like_ratio,
             "skip_ratio": skip_ratio,
             "pool": [
-                "You move through life with confidence… and a bold opportunity will soon reward you.",
-                "You know what draws you in, and that certainty will open an unexpected door.",
-                "Your future favors decisive energy… what you choose next will shift more than you expect.",
-                "You follow desire without hesitation… and fortune answers that courage.",
-                "What you choose boldly now… will return to you as luck.",
-                "A risk meant for you is already approaching.",
-                "Your confidence is becoming a magnet for rare opportunities.",
-                "You are not waiting for the future. You are pulling it toward you.",
-                "A single fearless choice will set something powerful in motion.",
-                "You trust your instincts… and they are already aligning things in your favor.",
-                "What you claim without doubt… will begin to shape itself around you.",
-                "Opportunity recognizes your certainty… and moves closer because of it.",
-                "You are closer than you think… to something worth the risk.",
-                "Your momentum is building… and it will soon carry you further than expected.",
-                "The next step you take boldly… will open more than one path."
+                "\"You move through life with confidence… and a bold opportunity will soon reward you.\"",
+                "\"You know what draws you in, and that certainty will open an unexpected door.\"",
+                "\"Your future favors decisive energy… what you choose next will shift more than you expect.\"",
+                "\"You follow desire without hesitation… and fortune answers that courage.\"",
+                "\"What you choose boldly now… will return to you as luck.\"",
+                "\"A risk meant for you is already approaching.\"",
+                "\"Your confidence is becoming a magnet for rare opportunities.\"",
+                "\"You are not waiting for the future. You are pulling it toward you.\"",
+                "\"A single fearless choice will set something powerful in motion.\"",
+                "\"You trust your instincts… and they are already aligning things in your favor.\"",
+                "\"What you claim without doubt… will begin to shape itself around you.\""
+                "\"Opportunity recognizes your certainty… and moves closer because of it.\"",
+                "\"You are closer than you think… to something worth the risk.\"",
+                "\"Your momentum is building… and it will soon carry you further than expected.\"",
+                "\"The next step you take boldly… will open more than one path.\""
             ]
         }
     elif skip_count >= 12 and skip_ratio >= 0.7:
@@ -271,21 +271,21 @@ def get_fortune_state(uid: str):
             "like_ratio": like_ratio,
             "skip_ratio": skip_ratio,
             "pool": [
-                "You are guided by discernment, not distraction. A clearer path is forming ahead of you.",
-                "You reject what is not yours… and that wisdom protects your future.",
-                "Your restraint is a strength… by turning away, you make space for what matters.",
-                "Your future sharpens each time you refuse what does not fit.",
-                "Clarity is becoming your greatest advantage.",
-                "You are cutting through illusions… and something real will soon reveal itself.",
-                "Your ability to say no is quietly shaping a more honest destiny.",
-                "You are not missing out. You are refining what truly belongs to you.",
-                "By filtering the noise, you are making room for something rare.",
-                "What you release now… creates space for something more precise.",
-                "Your standards are rising… and your path is adjusting to match.",
-                "You see what others overlook… and that awareness will guide you forward.",
-                "By choosing less… you are preparing to receive more of what matters.",
-                "Your patience is not empty… it is quietly aligning things in your favor.",
-                "You are narrowing the path… until only the right one remains."
+                "\"You are guided by discernment, not distraction. A clearer path is forming ahead of you.\"",
+                "\"You reject what is not yours… and that wisdom protects your future.\"",
+                "\"Your restraint is a strength… by turning away, you make space for what matters.\"",
+                "\"Your future sharpens each time you refuse what does not fit.\"",
+                "\"Clarity is becoming your greatest advantage.\"",
+                "\"You are cutting through illusions… and something real will soon reveal itself.\"",
+                "\"Your ability to say no is quietly shaping a more honest destiny.\"",
+                "\"You are not missing out. You are refining what truly belongs to you.\"",
+                "\"By filtering the noise, you are making room for something rare.\"",
+                "\"What you release now… creates space for something more precise.\"",
+                "\"Your standards are rising… and your path is adjusting to match.\""
+                "\"You see what others overlook… and that awareness will guide you forward.\"",
+                "\"By choosing less… you are preparing to receive more of what matters.\"",
+                "\"Your patience is not empty… it is quietly aligning things in your favor.\"",
+                "\"You are narrowing the path… until only the right one remains.\""
             ]
         }
     elif like_count > skip_count:
@@ -297,21 +297,21 @@ def get_fortune_state(uid: str):
             "like_ratio": like_ratio,
             "skip_ratio": skip_ratio,
             "pool": [
-                "You follow curiosity with an open heart. Soon, something new will feel instantly familiar.",
-                "You are drawn to possibility, and that openness will bring a fortunate surprise.",
-                "Your future carries momentum. What excites you now is pointing toward what comes next.",
-                "You are expanding faster than you realize, and the world is beginning to respond.",
-                "An unexpected invitation will match the energy you have been moving toward.",
-                "Your openness will lead you somewhere richer than your original plan.",
-                "What delights you now is more than a preference… it is a direction.",
-                "You are gathering signals from the future through what draws you in today.",
-                "A joyful instinct will soon prove wiser than logic alone.",
-                "Curiosity is guiding you… and it is leading somewhere worth arriving.",
-                "What you choose with lightness… will quietly shape something meaningful.",
-                "You are following a feeling… and it is closer to truth than it seems.",
-                "Your attention is shifting… and new doors are adjusting to meet it.",
-                "The things that spark interest now… will soon begin to connect.",
-                "You are exploring the right edges… and something unexpected is waiting there."
+                "\"You follow curiosity with an open heart. Soon, something new will feel instantly familiar.\"",
+                "\"You are drawn to possibility, and that openness will bring a fortunate surprise.\"",
+                "\"Your future carries momentum. What excites you now is pointing toward what comes next.\"",
+                "\"You are expanding faster than you realize, and the world is beginning to respond.\"",
+                "\"An unexpected invitation will match the energy you have been moving toward.\"",
+                "\"Your openness will lead you somewhere richer than your original plan.\"",
+                "\"What delights you now is more than a preference… it is a direction.\"",
+                "\"You are gathering signals from the future through what draws you in today.\"",
+                "\"A joyful instinct will soon prove wiser than logic alone.\"",
+                "\"Curiosity is guiding you… and it is leading somewhere worth arriving.\"",
+                "\"What you choose with lightness… will quietly shape something meaningful.\""
+                "\"You are following a feeling… and it is closer to truth than it seems.\"",
+                "\"Your attention is shifting… and new doors are adjusting to meet it.\"",
+                "\"The things that spark interest now… will soon begin to connect.\"",
+                "\"You are exploring the right edges… and something unexpected is waiting there.\""
             ]
         }
     elif skip_count > like_count:
@@ -323,21 +323,21 @@ def get_fortune_state(uid: str):
             "like_ratio": like_ratio,
             "skip_ratio": skip_ratio,
             "pool": [
-                "You trust your inner filter, and it is sharpening your destiny.",
-                "You are narrowing the noise around you… what remains will truly matter.",
-                "Your future grows clearer with every choice you refuse.",
-                "You are learning through elimination… and that knowledge is powerful.",
-                "What you reject now is protecting the shape of what comes next.",
-                "The path ahead is revealing itself… now that you no longer chase everything.",
-                "There is power in your refusal, and it will soon reveal purpose.",
-                "By stepping away from the wrong things… you move closer to the right one.",
-                "Your patience with imperfection will soon be rewarded by something unmistakable.",
-                "Each no you choose… brings the right yes into focus.",
-                "You are refining your path… until only what matters remains.",
-                "What you dismiss now… would have distracted you later.",
-                "Your clarity is cutting deeper… and revealing what is true.",
-                "You are leaving behind what no longer resonates… and the future is adjusting.",
-                "Less is becoming more… and it is guiding you somewhere precise."
+                "\"You trust your inner filter, and it is sharpening your destiny.\"",
+                "\"You are narrowing the noise around you… what remains will truly matter.\"",
+                "\"Your future grows clearer with every choice you refuse.\"",
+                "\"You are learning through elimination… and that knowledge is powerful.\"",
+                "\"What you reject now is protecting the shape of what comes next.\"",
+                "\"The path ahead is revealing itself… now that you no longer chase everything.\"",
+                "\"There is power in your refusal, and it will soon reveal purpose.\"",
+                "\"By stepping away from the wrong things… you move closer to the right one.\"",
+                "\"Your patience with imperfection will soon be rewarded by something unmistakable.\"",
+                "\"Each no you choose… brings the right yes into focus.\"",
+                "\"You are refining your path… until only what matters remains.\"",
+                "\"What you dismiss now… would have distracted you later.\"",
+                "\"Your clarity is cutting deeper… and revealing what is true.\"",
+                "\"You are leaving behind what no longer resonates… and the future is adjusting.\"",
+                "\"Less is becoming more… and it is guiding you somewhere precise.\""
             ]
         }
     else:
@@ -349,21 +349,21 @@ def get_fortune_state(uid: str):
             "like_ratio": like_ratio,
             "skip_ratio": skip_ratio,
             "pool": [
-                "You balance instinct and caution with rare precision. A meaningful choice is approaching.",
-                "You move carefully, but without fear… and that balance will serve you well",
-                "You are learning not only what you want, but why. That knowledge will shape your next chapter.",
-                "You stand between desire and discernment, and that is where wisdom grows.",
-                "A balanced heart often sees what others overlook.",
-                "You are not divided. You are measuring the world with care.",
-                "Because you weigh both impulse and restraint... your next step will carry unusual strength.",
-                "Your future is being built on thoughtful tension, and that makes it resilient.",
-                "The harmony between your curiosity and caution will soon reveal a clear answer.",
-                "You are holding both paths in view… and clarity is beginning to settle.",
-                "Balance is guiding you… quietly aligning your next decision.",
-                "You are neither rushing nor resisting… and that is shaping something steady.",
-                "Your awareness of both risks and rewards… will soon reveal the right moment.",
-                "You are finding center… and from there, your direction will strengthen.",
-                "What you consider now… will soon crystallize into certainty."
+                "\"You balance instinct and caution with rare precision. A meaningful choice is approaching.\"",
+                "\"You move carefully, but without fear… and that balance will serve you well\"",
+                "\"You are learning not only what you want, but why. That knowledge will shape your next chapter.\"",
+                "\"You stand between desire and discernment, and that is where wisdom grows.\"",
+                "\"A balanced heart often sees what others overlook.\"",
+                "\"You are not divided. You are measuring the world with care.\"",
+                "\"Because you weigh both impulse and restraint... your next step will carry unusual strength.\"",
+                "\"Your future is being built on thoughtful tension, and that makes it resilient.\"",
+                "\"The harmony between your curiosity and caution will soon reveal a clear answer.\"",
+                "\"You are holding both paths in view… and clarity is beginning to settle.\"",
+                "\"Balance is guiding you… quietly aligning your next decision.\""
+                "\"You are neither rushing nor resisting… and that is shaping something steady.\"",
+                "\"Your awareness of both risks and rewards… will soon reveal the right moment.\"",
+                "\"You are finding center… and from there, your direction will strengthen.\"",
+                "\"What you consider now… will soon crystallize into certainty.\""
             ]
         }
 
