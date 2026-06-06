@@ -21,17 +21,19 @@ const reportAdvance = (itemId) => {
     .catch(() => {});
 };
 
-function Card({ item, onLike, onSkip }) {
+function Card({ item, onLike, onSkip, isTop = true }) {
   const [dragX, setDragX] = useState(0);
   const [exitDir, setExitDir] = useState(null);
 
   const handlers = useSwipeable({
     onSwiping: ({ deltaX }) => setDragX(deltaX),
     onSwipedLeft: () => {
+      if (!isTop) return;
       setExitDir("left");
       setTimeout(() => onSkip(item), 220);
     },
     onSwipedRight: () => {
+      if (!isTop) return;
       setExitDir("right");
       setTimeout(() => onLike(item), 220);
     },
@@ -58,18 +60,18 @@ function Card({ item, onLike, onSkip }) {
     dragX < 0 ? 1 + clamp(Math.abs(dragX) / intensity, 0, maxGrow) : 1;
 
   return (
-    <div style={{ width: "100%", height: "100%" }}>
+    <div style={{ width: 1034, overflow: "hidden", marginLeft: "-61em" }}>
       <div
-        {...handlers}
+        {...(isTop ? handlers : {})}
         style={{
-          width: "100%",
-          height: "100%",
           transform:
             exitDir === "left"
               ? "translateX(-160%) rotate(-10deg)"
               : exitDir === "right"
               ? "translateX(160%) rotate(10deg)"
-              : `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`,
+              : isTop
+              ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`
+              : "none",
           transition: exitDir ? "transform 220ms ease-out" : "none",
           willChange: "transform",
           touchAction: "pan-y",
@@ -103,8 +105,8 @@ function Card({ item, onLike, onSkip }) {
               marginLeft: -80,
               marginTop: -45,
               display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              alignItems: "right",
+              justifyContent: "right",
               borderColor: "#ffffff",
               border: "5px solid #ffffff",
               borderRadius: "25px",
@@ -112,7 +114,8 @@ function Card({ item, onLike, onSkip }) {
               transition: "transform 120ms ease-out",
               backgroundColor: "#000000",
             }}
-            onClick={() => onSkip(item)}
+            onClick={isTop ? () => onSkip(item) : undefined}
+            disabled={!isTop}
           >
             <img
               src={SkipIcon}
@@ -133,8 +136,8 @@ function Card({ item, onLike, onSkip }) {
               marginRight: -80,
               marginTop: -40,
               display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              alignItems: "left",
+              justifyContent: "left",
               marginLeft: "auto",
               borderColor: "#ffffff",
               border: "5px solid #ffffff",
@@ -143,7 +146,8 @@ function Card({ item, onLike, onSkip }) {
               transition: "transform 120ms ease-out",
               backgroundColor: "#000000",
             }}
-            onClick={() => onLike(item)}
+            onClick={isTop ? () => onLike(item) : undefined}
+            disabled={!isTop}
           >
             <img
               src={HeartIcon}
@@ -295,14 +299,7 @@ export default function App() {
         </div>
       ) : queue.length ? (
         <>
-          <div
-            style={{
-              position: "relative",
-              width: 1034,
-              height: 1180,
-              margin: "0 auto",
-            }}
-          >
+          <div style={{ position: "relative" }}>
             {queue.slice(0, 4).map((item, index) => {
               const isTop = index === 0;
 
@@ -310,18 +307,25 @@ export default function App() {
                 <div
                   key={item.item_id}
                   style={{
-                    position: "absolute",
-                    inset: 0,
+                    position: isTop ? "relative" : "absolute",
+                    top: isTop ? "auto" : 0,
+                    left: isTop ? "auto" : 0,
+                    right: isTop ? "auto" : 0,
                     zIndex: 100 - index,
                     transform: isTop
-                      ? "translateY(0px) scale(1)"
-                      : `translateY(${index * 18}px) scale(${1 - index * 0.04})`,
-                    opacity: isTop ? 1 : 0.95 - index * 0.12,
+                      ? "none"
+                      : `translateY(${index * 14}px) scale(${1 - index * 0.03})`,
+                    opacity: isTop ? 1 : 0.9 - index * 0.1,
                     pointerEvents: isTop ? "auto" : "none",
                     transition: "transform 180ms ease, opacity 180ms ease",
                   }}
                 >
-                  <Card item={item} onLike={onLike} onSkip={onSkip} />
+                  <Card
+                    item={item}
+                    onLike={onLike}
+                    onSkip={onSkip}
+                    isTop={isTop}
+                  />
                 </div>
               );
             })}
