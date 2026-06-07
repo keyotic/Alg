@@ -526,6 +526,11 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 def refresh_pending_rows(uid: str, new_items: list):
     USER_PENDING_ROWS[uid] = []
     for item in new_items:
+        item_id = item["item_id"]
+        if item_id in USER_HISTORY_ROWS.get(uid, {}):
+            continue
+        if USER_ACTIVE_ROW.get(uid, {}).get("item", {}).get("item_id") == item_id:
+            continue
         USER_PENDING_ROWS[uid].append({
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
