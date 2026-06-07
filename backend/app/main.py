@@ -33,6 +33,10 @@ ITEM_VECS = np.load(VECTORS_PATH)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
+orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
+if orphans:
+    print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
+
 EMBED_DIM = ITEM_VECS.shape[1]
 
 class ItemStatus(str, Enum):
@@ -109,6 +113,22 @@ def healthz():
     return {"ok": True, "count": len(ITEM_IDS)}
 
 
+def get_user_vec(uid: str):
+    return USER_VEC.get(uid, None)
+
+
+def set_user_vec(uid: str, v):
+    USER_VEC[uid] = v
+
+
+def mark_seen(uid: str, item_id: str):
+    USER_SEEN.setdefault(uid, set()).add(item_id)
+
+
+def has_seen(uid: str, item_id: str):
+    return item_id in USER_SEEN.get(uid, set())
+
+
 def mark_active(uid: str):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
     LAST_ACTIVE_USER = uid
@@ -123,33 +143,6 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
-def set_user_vec(uid: str, v):
-    USER_VEC[uid] = v
-
-
-def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
-    u = USER_VEC.get(uid)
-    if u is None:
-        u = item_vec.copy() if like else np.random.randn(EMBED_DIM).astype("float32")
-        u /= np.linalg.norm(u) + 1e-8
-    else:
-        if like:
-            u = lam * u + (1 - lam) * item_vec
-        else:
-            u = lam * u - (1 - lam) * 0.1 * item_vec
-        u /= np.linalg.norm(u) + 1e-8
-    USER_VEC[uid] = u
-    return u
-
-
-def mark_seen(uid: str, item_id: str):
-    USER_SEEN.setdefault(uid, set()).add(item_id)
-
-
-def has_seen(uid: str, item_id: str):
-    return item_id in USER_SEEN.get(uid, set())
-
-
 def ensure_history_row(uid: str, item: dict):
     USER_HISTORY_ROWS.setdefault(uid, {})
     item_id = item["item_id"]
@@ -157,6 +150,7 @@ def ensure_history_row(uid: str, item: dict):
         USER_HISTORY_ROWS[uid][item_id] = {
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
+            "position": len(USER_HISTORY_ROWS[uid]) + 1,
             "ts": time.time(),
         }
 
@@ -173,10 +167,15 @@ def set_active_row(uid: str, item: dict):
     USER_ACTIVE_ROW[uid] = {
         "item": item.copy(),
         "status": ItemStatus.ACTIVE.value,
+        "position": len(USER_HISTORY_ROWS.get(uid, {})) + 1,
         "ts": time.time(),
     }
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid][item["item_id"]] = ItemStatus.ACTIVE.value
+
+
+def clear_active_row(uid: str):
+    USER_ACTIVE_ROW.pop(uid, None)
 
 
 def set_pending_rows(uid: str, items: list):
@@ -185,8 +184,13 @@ def set_pending_rows(uid: str, items: list):
         USER_PENDING_ROWS[uid].append({
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
+            "position": 0,
             "ts": time.time(),
         })
+
+
+def get_item_status(uid: str, item_id: str):
+    return USER_ITEM_STATUS.get(uid, {}).get(item_id, ItemStatus.PENDING.value)
 
 
 def get_fortune_state(uid: str):
@@ -364,37 +368,24 @@ def get_preview_fortune(uid: str):
     return pool[idx]
 
 
-def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
+def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
     u = USER_VEC.get(uid)
     if u is None:
-        items = [iid for iid in ITEM_IDS if iid in ITEMS_META and (not exclude_seen or not has_seen(uid, iid))]
-        items = items[:limit]
-        return [serialize_item(i) for i in items] if include_debug else [convert_path_to_url(ITEMS_META[i]) for i in items]
-
-    q = u.reshape(1, -1).astype("float32")
-    k_candidates = max(limit * 5, 100)
-    sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
-    idxes, sims = idxes[0], sims[0]
-
-    cand = [
-        (ITEM_IDS[i], float(sims[j]), i)
-        for j, i in enumerate(idxes)
-        if 0 <= i < len(ITEM_IDS) and ITEM_IDS[i] in ITEMS_META and (not exclude_seen or not has_seen(uid, ITEM_IDS[i]))
-    ]
-
-    if not cand:
-        return []
-
-    scored = score_items(u, np.array([c[2] for c in cand]), np.array([c[1] for c in cand]), len(cand))
-    reranked = mmr_rerank(u, scored, limit, lam=0.7)
-
-    if include_debug:
-        return [serialize_item(iid, score=score, row_idx=row_idx) for (iid, score, row_idx) in reranked]
-    return [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked]
+        u = item_vec.copy() if like else np.random.randn(EMBED_DIM).astype("float32")
+        u /= np.linalg.norm(u) + 1e-8
+    else:
+        if like:
+            u = lam * u + (1 - lam) * item_vec
+        else:
+            u = lam * u - (1 - lam) * 0.1 * item_vec
+        u /= np.linalg.norm(u) + 1e-8
+    USER_VEC[uid] = u
+    return u
 
 
 def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk: int):
     now = time.time()
+    alpha, beta, gamma = 0.85, 0.10, 0.05
     scored = []
     for row_idx, sim in zip(idxes, sims):
         if row_idx < 0 or row_idx >= len(ITEM_IDS):
@@ -404,7 +395,7 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
             continue
         pop = POPULARITY.get(item_id, 0.0)
         recency = np.exp(-max(0, now - CREATED_AT.get(item_id, now)) / (7 * 24 * 3600))
-        s = 0.85 * float(sim) + 0.10 * pop + 0.05 * recency
+        s = alpha * float(sim) + beta * pop + gamma * recency
         scored.append((item_id, s, row_idx))
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:topk]
@@ -462,33 +453,115 @@ def serialize_item(item_id: str, score: float = None, row_idx: int = None):
     return result
 
 
-def rebuild_csv_rows(uid: str):
+def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
+    u = get_user_vec(uid)
+    k_candidates = max(limit * 5, 100)
+
+    if u is None:
+        items = []
+        for item_id in ITEM_IDS:
+            if item_id not in ITEMS_META:
+                continue
+            if not exclude_seen or not has_seen(uid, item_id):
+                items.append(item_id)
+            if len(items) >= limit * 3:
+                break
+        if include_debug:
+            result = [serialize_item(i) for i in items[:limit]]
+            return [x for x in result if x is not None]
+        return [convert_path_to_url(ITEMS_META[i]) for i in items[:limit]]
+
+    q = u.reshape(1, -1).astype("float32")
+    attempts = [k_candidates, k_candidates * 3, k_candidates * 10, len(ITEM_IDS)]
+    cand = []
+
+    for attempt_k in attempts:
+        attempt_k = min(attempt_k, len(ITEM_IDS))
+        sims, idxes = index.search(q, attempt_k)
+        idxes, sims = idxes[0], sims[0]
+        cand = [
+            (ITEM_IDS[i], float(sims[j]), i)
+            for j, i in enumerate(idxes)
+            if 0 <= i < len(ITEM_IDS)
+            and ITEM_IDS[i] in ITEMS_META
+            and (not exclude_seen or not has_seen(uid, ITEM_IDS[i]))
+        ]
+        if len(cand) >= limit:
+            break
+
+    if len(cand) < limit:
+        liked_seen = {iid for iid in USER_SEEN.get(uid, set()) if POPULARITY.get(iid, 0.0) > 0}
+        sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
+        idxes, sims = idxes[0], sims[0]
+        cand = [
+            (ITEM_IDS[i], float(sims[j]), i)
+            for j, i in enumerate(idxes)
+            if 0 <= i < len(ITEM_IDS)
+            and ITEM_IDS[i] in ITEMS_META
+            and ITEM_IDS[i] not in liked_seen
+        ]
+
+    if len(cand) < limit:
+        already = {c[0] for c in cand}
+        for i, item_id in enumerate(ITEM_IDS):
+            if item_id in ITEMS_META and item_id not in already and item_id not in USER_SEEN.get(uid, set()):
+                sim = float(np.dot(u, ITEM_VECS[i]))
+                cand.append((item_id, sim, i))
+            if len(cand) >= limit * 2:
+                break
+
+    if not cand:
+        return []
+
+    scored = score_items(u, np.array([c[2] for c in cand]), np.array([c[1] for c in cand]), len(cand))
+    reranked = mmr_rerank(u, scored, limit, lam=0.7)
+
+    if include_debug:
+        result = [serialize_item(iid, score=score, row_idx=row_idx) for (iid, score, row_idx) in reranked if iid in ITEMS_META]
+        return [x for x in result if x is not None]
+
+    return [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked if iid in ITEMS_META]
+
+
+def refresh_pending_rows(uid: str, new_items: list):
+    USER_PENDING_ROWS[uid] = []
+    for item in new_items:
+        USER_PENDING_ROWS[uid].append({
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": 0,
+            "ts": time.time(),
+        })
+
+
+def rebuild_csv_state(uid: str):
     rows = []
+    history = USER_HISTORY_ROWS.get(uid, {})
+    for rec in sorted(history.values(), key=lambda r: r["ts"]):
+        rows.append(rec.copy())
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
-        active_row = active.copy()
-        active_row["position"] = 1
-        rows.append(active_row)
-
-    history = sorted(USER_HISTORY_ROWS.get(uid, {}).values(), key=lambda r: r["ts"])
-    for rec in history:
-        row = rec.copy()
-        row["position"] = len(rows) + 1
-        rows.append(row)
+        rows.append(active.copy())
 
     pending = USER_PENDING_ROWS.get(uid, [])
-    for rec in pending:
-        row = rec.copy()
-        row["position"] = len(rows) + 1
-        rows.append(row)
+    rows.extend([r.copy() for r in pending])
 
-    USER_ITEM_STATUS[uid] = {row["item"]["item_id"]: row["status"] for row in rows}
+    for i, row in enumerate(rows, start=1):
+        row["position"] = i
+        if row["status"] == ItemStatus.ACTIVE.value:
+            pass
+
+    USER_ITEM_STATUS.setdefault(uid, {})
+    USER_ITEM_STATUS[uid] = {}
+    for row in rows:
+        USER_ITEM_STATUS[uid][row["item"]["item_id"]] = row["status"]
+
     return rows
 
 
 def write_user_feed_csv(uid: str):
-    rows = rebuild_csv_rows(uid)
+    rows = rebuild_csv_state(uid)
     lines = ["position,status,item_id,title"]
     for row in rows:
         item = row["item"]
@@ -503,23 +576,26 @@ def write_user_feed_csv(uid: str):
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
-        items = build_feed_items(req.user_id, req.limit, req.exclude_seen, include_debug=True)
+        items = build_feed_items(
+            uid=req.user_id,
+            limit=req.limit,
+            exclude_seen=req.exclude_seen,
+            include_debug=True
+        )
+
         USER_CURRENT_FEED[req.user_id] = items
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
         USER_PENDING_ROWS.setdefault(req.user_id, [])
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
-        if not USER_HISTORY_ROWS[req.user_id] and items:
-            set_active_row(req.user_id, items[0])
+        if not USER_HISTORY_ROWS[req.user_id]:
             for item in items[1:]:
                 ensure_history_row(req.user_id, item)
-            set_pending_rows(req.user_id, [])
+            if items:
+                set_active_row(req.user_id, items[0])
+                USER_ACTIVE_ROW[req.user_id]["position"] = 1
         else:
-            set_pending_rows(req.user_id, items)
-            if req.user_id not in USER_ACTIVE_ROW or USER_ACTIVE_ROW[req.user_id]["item"]["item_id"] not in [x["item_id"] for x in items]:
-                if items:
-                    set_active_row(req.user_id, items[0])
-                    USER_PENDING_ROWS[req.user_id] = USER_PENDING_ROWS[req.user_id][1:]
+            refresh_pending_rows(req.user_id, items)
 
         write_user_feed_csv(req.user_id)
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
@@ -547,25 +623,39 @@ def interactions(evt: Interaction):
     except ValueError:
         raise HTTPException(status_code=404, detail="Unknown item_id")
 
-    like = evt.action == "like"
     item_vec = ITEM_VECS[row_idx]
+    like = (evt.action == "like")
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
+
+    if evt.user_id in USER_ACTIVE_ROW and USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"] == evt.item_id:
+        USER_ACTIVE_ROW[evt.user_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
+        USER_HISTORY_ROWS[evt.user_id][evt.item_id] = USER_ACTIVE_ROW[evt.user_id].copy()
+        clear_active_row(evt.user_id)
+    else:
+        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
+        if evt.item_id not in USER_HISTORY_ROWS[evt.user_id]:
+            USER_HISTORY_ROWS[evt.user_id][evt.item_id] = {
+                "item": convert_path_to_url(ITEMS_META[evt.item_id]),
+                "status": ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value,
+                "position": len(USER_HISTORY_ROWS[evt.user_id]) + 1,
+                "ts": time.time(),
+            }
+        else:
+            USER_HISTORY_ROWS[evt.user_id][evt.item_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+
     set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    if evt.user_id in USER_ACTIVE_ROW and USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"] == evt.item_id:
-        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
-        USER_HISTORY_ROWS[evt.user_id][evt.item_id] = {
-            "item": USER_ACTIVE_ROW[evt.user_id]["item"].copy(),
-            "status": ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value,
-            "ts": time.time(),
-        }
-        clear_active_row(evt.user_id)
-
-    fresh = build_feed_items(evt.user_id, limit=5, exclude_seen=True, include_debug=True)
-    set_pending_rows(evt.user_id, fresh)
+    fresh = build_feed_items(
+        uid=evt.user_id,
+        limit=5,
+        exclude_seen=True,
+        include_debug=True
+    )
+    refresh_pending_rows(evt.user_id, fresh)
 
     if fresh:
         set_active_row(evt.user_id, fresh[0])
@@ -596,6 +686,7 @@ def get_fortune(user_id: str):
 @app.post("/reset")
 def reset(req: ResetRequest):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
+
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
     USER_HISTORY.pop(req.user_id, None)
@@ -627,7 +718,11 @@ def admin_users():
                 "history_count": len(USER_HISTORY.get(uid, [])),
                 "is_active": uid == LAST_ACTIVE_USER,
             }
-            for uid in sorted(set(list(USER_VEC.keys()) + list(USER_SEEN.keys()) + list(USER_HISTORY.keys())))
+            for uid in sorted(set(
+                list(USER_VEC.keys()) +
+                list(USER_SEEN.keys()) +
+                list(USER_HISTORY.keys())
+            ))
         ]
     }
 
@@ -638,7 +733,8 @@ def admin_user_detail(user_id: str):
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(user_id)
-    rows = rebuild_csv_rows(user_id)
+    csv_rows = rebuild_csv_state(user_id)
+
     return {
         "user_id": user_id,
         "has_vector": user_id in USER_VEC,
@@ -656,7 +752,7 @@ def admin_user_detail(user_id: str):
         "fortune_total_interactions": state["total"],
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
-        "csv_rows": rows,
+        "csv_rows": csv_rows,
         "item_status": USER_ITEM_STATUS.get(user_id, {}),
     }
 
@@ -689,7 +785,8 @@ def admin_current_user():
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(uid)
-    rows = rebuild_csv_rows(uid)
+    csv_rows = rebuild_csv_state(uid)
+
     return {
         "active_user": uid,
         "has_vector": uid in USER_VEC,
@@ -706,7 +803,7 @@ def admin_current_user():
         "fortune_total_interactions": state["total"],
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
-        "csv_rows": rows,
+        "csv_rows": csv_rows,
         "item_status": USER_ITEM_STATUS.get(uid, {}),
     }
 
@@ -714,17 +811,31 @@ def admin_current_user():
 @app.get("/admin/popularity")
 def admin_popularity():
     sorted_items = sorted(POPULARITY.items(), key=lambda x: x[1], reverse=True)
-    return {"items": [{"item_id": iid, "likes": int(count)} for iid, count in sorted_items if count > 0]}
+    return {
+        "items": [
+            {"item_id": iid, "likes": int(count)}
+            for iid, count in sorted_items
+            if count > 0
+        ]
+    }
 
 
 @app.get("/admin/current-feed/{user_id}")
 def admin_current_feed(user_id: str, limit: int = 8):
-    return {"user_id": user_id, "current_feed": rebuild_csv_rows(user_id)[:limit]}
+    return {
+        "user_id": user_id,
+        "current_feed": get_current_feed_preview(user_id, limit=limit, include_active=True)
+    }
 
 
 @app.post("/admin/preview-feed/{user_id}")
 def admin_preview_feed(user_id: str, limit: int = 15):
-    items = build_feed_items(user_id, limit, True, include_debug=False)
+    items = build_feed_items(
+        uid=user_id,
+        limit=limit,
+        exclude_seen=True,
+        include_debug=False
+    )
     return {"items": items}
 
 
@@ -733,7 +844,7 @@ def admin_feed_csv():
     if not LAST_ACTIVE_USER:
         content = "position,status,item_id,title\n"
     else:
-        rows = rebuild_csv_rows(LAST_ACTIVE_USER)
+        rows = rebuild_csv_state(LAST_ACTIVE_USER)
         lines = ["position,status,item_id,title"]
         for row in rows:
             item = row["item"]
