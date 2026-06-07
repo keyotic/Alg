@@ -52,6 +52,7 @@ USER_CURRENT_FEED = {}
 USER_FEED_INDEX = {}
 USER_ITEM_STATUS = {}
 USER_INTERACTIONS = {}
+
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
 
@@ -333,10 +334,8 @@ def get_preview_fortune(uid: str):
     state = get_fortune_state(uid)
     pool = state["pool"]
     total = state["total"]
-
     if not pool:
         return None
-
     idx = min(total, len(pool) - 1)
     return pool[idx]
 
@@ -382,14 +381,11 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
     selected = []
     selected_vecs = []
     cand_items = [(item_id, score, row_idx) for (item_id, score, row_idx) in candidates]
-
     if not cand_items:
         return []
-
     first = cand_items[0]
     selected.append(first)
     selected_vecs.append(ITEM_VECS[first[2]])
-
     while len(selected) < min(topn, len(cand_items)):
         best_idx = None
         best_val = -1e9
@@ -436,7 +432,6 @@ def serialize_item(item_id: str, score: float = None, row_idx: int = None):
 def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
     u = get_user_vec(uid)
     k_candidates = max(limit * 5, 100)
-
     if u is None:
         items = []
         for item_id in ITEM_IDS:
@@ -446,23 +441,18 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
                 items.append(item_id)
             if len(items) >= limit * 3:
                 break
-
         if include_debug:
             result = [serialize_item(i) for i in items[:limit]]
             return [x for x in result if x is not None]
-
         return [convert_path_to_url(ITEMS_META[i]) for i in items[:limit]]
 
     q = u.reshape(1, -1).astype("float32")
-
     attempts = [k_candidates, k_candidates * 3, k_candidates * 10, len(ITEM_IDS)]
     cand = []
-
     for attempt_k in attempts:
         attempt_k = min(attempt_k, len(ITEM_IDS))
         sims, idxes = index.search(q, attempt_k)
         idxes, sims = idxes[0], sims[0]
-
         cand = [
             (ITEM_IDS[i], float(sims[j]), i)
             for j, i in enumerate(idxes)
@@ -470,16 +460,11 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             and ITEM_IDS[i] in ITEMS_META
             and (not exclude_seen or not has_seen(uid, ITEM_IDS[i]))
         ]
-
         if len(cand) >= limit:
             break
 
     if len(cand) < limit:
-        liked_seen = {
-            iid for iid in USER_SEEN.get(uid, set())
-            if POPULARITY.get(iid, 0.0) > 0
-        }
-
+        liked_seen = {iid for iid in USER_SEEN.get(uid, set()) if POPULARITY.get(iid, 0.0) > 0}
         sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
         idxes, sims = idxes[0], sims[0]
         cand = [
@@ -493,11 +478,7 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
     if len(cand) < limit:
         already = {c[0] for c in cand}
         for i, item_id in enumerate(ITEM_IDS):
-            if (
-                item_id in ITEMS_META
-                and item_id not in already
-                and item_id not in USER_SEEN.get(uid, set())
-            ):
+            if item_id in ITEMS_META and item_id not in already and item_id not in USER_SEEN.get(uid, set()):
                 sim = float(np.dot(u, ITEM_VECS[i]))
                 cand.append((item_id, sim, i))
             if len(cand) >= limit * 2:
@@ -506,63 +487,65 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
     if not cand:
         return []
 
-    scored = score_items(
-        u,
-        np.array([c[2] for c in cand]),
-        np.array([c[1] for c in cand]),
-        len(cand)
-    )
+    scored = score_items(u, np.array([c[2] for c in cand]), np.array([c[1] for c in cand]), len(cand))
     reranked = mmr_rerank(u, scored, limit, lam=0.7)
 
     if include_debug:
-        result = [
-            serialize_item(iid, score=score, row_idx=row_idx)
-            for (iid, score, row_idx) in reranked
-            if iid in ITEMS_META
-        ]
+        result = [serialize_item(iid, score=score, row_idx=row_idx) for (iid, score, row_idx) in reranked if iid in ITEMS_META]
         return [x for x in result if x is not None]
 
-    return [
-        convert_path_to_url(ITEMS_META[iid])
-        for (iid, _, _) in reranked
-        if iid in ITEMS_META
-    ]
+    return [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked if iid in ITEMS_META]
 
 
 def refresh_pending_with_new_feed(uid: str, new_items: list):
     USER_INTERACTIONS.setdefault(uid, {})
-    existing = USER_INTERACTIONS[uid]
+    records = USER_INTERACTIONS[uid]
 
-    active_id = None
-    for iid, rec in existing.items():
-        if rec["status"] == ItemStatus.ACTIVE.value:
-            active_id = iid
-            break
+    active_ids = [iid for iid, rec in records.items() if rec["status"] == ItemStatus.ACTIVE.value]
+    if len(active_ids) > 1:
+        keep_active = active_ids[0]
+        for iid in active_ids[1:]:
+            records[iid]["status"] = ItemStatus.PENDING.value if records[iid]["status"] == ItemStatus.ACTIVE.value else records[iid]["status"]
+            USER_ITEM_STATUS.setdefault(uid, {})
+            USER_ITEM_STATUS[uid][iid] = records[iid]["status"]
+        records[keep_active]["status"] = ItemStatus.ACTIVE.value
+        USER_ITEM_STATUS.setdefault(uid, {})
+        USER_ITEM_STATUS[uid][keep_active] = ItemStatus.ACTIVE.value
 
-    for iid, rec in list(existing.items()):
-        if rec["status"] == ItemStatus.PENDING.value:
-            existing.pop(iid, None)
+    for iid in list(records.keys()):
+        if records[iid]["status"] == ItemStatus.PENDING.value:
+            records.pop(iid, None)
             USER_ITEM_STATUS.get(uid, {}).pop(iid, None)
 
-    for idx, item in enumerate(new_items):
+    for item in new_items:
         item_id = item["item_id"]
-        if item_id in existing:
-            if existing[item_id]["status"] == ItemStatus.PENDING.value:
-                existing[item_id]["item"] = item.copy()
+        if item_id in records:
+            if records[item_id]["status"] == ItemStatus.PENDING.value:
+                records[item_id]["item"] = item.copy()
             continue
-        existing[item_id] = {
+        records[item_id] = {
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
-            "position": len(existing) + 1,
+            "position": len(records) + 1,
             "first_seen_at": time.time(),
         }
 
-    if active_id is None and new_items:
+    active_ids = [iid for iid, rec in records.items() if rec["status"] == ItemStatus.ACTIVE.value]
+    if len(active_ids) == 0 and new_items:
         first_id = new_items[0]["item_id"]
-        if first_id in existing:
-            existing[first_id]["status"] = ItemStatus.ACTIVE.value
+        if first_id in records:
+            records[first_id]["status"] = ItemStatus.ACTIVE.value
             USER_ITEM_STATUS.setdefault(uid, {})
             USER_ITEM_STATUS[uid][first_id] = ItemStatus.ACTIVE.value
+    elif len(active_ids) > 1:
+        keep = active_ids[0]
+        for iid in active_ids[1:]:
+            records[iid]["status"] = ItemStatus.PENDING.value
+            USER_ITEM_STATUS.setdefault(uid, {})
+            USER_ITEM_STATUS[uid][iid] = ItemStatus.PENDING.value
+        records[keep]["status"] = ItemStatus.ACTIVE.value
+        USER_ITEM_STATUS.setdefault(uid, {})
+        USER_ITEM_STATUS[uid][keep] = ItemStatus.ACTIVE.value
 
 
 def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
@@ -570,20 +553,17 @@ def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = Tr
     if not records:
         return []
 
-    ordered = list(records.values())
-    if include_active:
-        feed_slice = ordered
-    else:
-        feed_slice = [r for r in ordered if r["status"] != ItemStatus.ACTIVE.value]
+    ordered = sorted(records.values(), key=lambda r: r["position"])
+    if not include_active:
+        ordered = [r for r in ordered if r["status"] != ItemStatus.ACTIVE.value]
 
     annotated = []
-    for rec in feed_slice[:limit]:
+    for rec in ordered[:limit]:
         item = rec["item"].copy()
         item["position"] = rec["position"]
         item["status"] = rec["status"]
         item["is_active"] = rec["status"] == ItemStatus.ACTIVE.value
         annotated.append(item)
-
     return annotated
 
 
@@ -596,7 +576,6 @@ def write_user_feed_csv(uid: str):
         item_id = str(item.get("item_id", "")).replace('"', '""')
         title = str(item.get("title", "")).replace('"', '""')
         lines.append(f'{rec["position"]},{rec["status"]},"{item_id}","{title}"')
-
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines))
 
@@ -614,11 +593,20 @@ def feed(req: FeedRequest):
         USER_CURRENT_FEED[req.user_id] = items
         USER_ITEM_STATUS.setdefault(req.user_id, {})
         USER_INTERACTIONS.setdefault(req.user_id, {})
+
         for item in items:
             upsert_interaction(req.user_id, item)
+
+        for iid, rec in USER_INTERACTIONS[req.user_id].items():
+            if rec["status"] == ItemStatus.ACTIVE.value:
+                rec["status"] = ItemStatus.PENDING.value
+                USER_ITEM_STATUS[req.user_id][iid] = ItemStatus.PENDING.value
+
         if items:
             first_id = items[0]["item_id"]
-            set_item_status(req.user_id, first_id, ItemStatus.ACTIVE)
+            USER_INTERACTIONS[req.user_id][first_id]["status"] = ItemStatus.ACTIVE.value
+            USER_ITEM_STATUS[req.user_id][first_id] = ItemStatus.ACTIVE.value
+
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         write_user_feed_csv(req.user_id)
         return {"items": clean}
@@ -657,9 +645,10 @@ def interactions(evt: Interaction):
     set_item_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    current_records = USER_INTERACTIONS.get(evt.user_id, {})
-    if evt.item_id in current_records:
-        current_records[evt.item_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+    records = USER_INTERACTIONS.get(evt.user_id, {})
+    if evt.item_id in records:
+        records[evt.item_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+        records[evt.item_id]["item"] = records[evt.item_id]["item"]
 
     fresh = build_feed_items(
         uid=evt.user_id,
@@ -669,10 +658,20 @@ def interactions(evt: Interaction):
     )
     refresh_pending_with_new_feed(evt.user_id, fresh)
 
-    pending = [r for r in USER_INTERACTIONS.get(evt.user_id, {}).values() if r["status"] == ItemStatus.PENDING.value]
-    if pending:
-        next_id = sorted(pending, key=lambda r: r["position"])[0]["item"]["item_id"]
-        set_item_status(evt.user_id, next_id, ItemStatus.ACTIVE)
+    active_ids = [iid for iid, rec in USER_INTERACTIONS.get(evt.user_id, {}).items() if rec["status"] == ItemStatus.ACTIVE.value]
+    if len(active_ids) != 1 and USER_INTERACTIONS.get(evt.user_id, {}):
+        keep = active_ids[0] if active_ids else None
+        if keep is None:
+            first_iid = sorted(USER_INTERACTIONS[evt.user_id].values(), key=lambda r: r["position"])[0]["item"]["item_id"]
+            USER_INTERACTIONS[evt.user_id][first_iid]["status"] = ItemStatus.ACTIVE.value
+            USER_ITEM_STATUS.setdefault(evt.user_id, {})
+            USER_ITEM_STATUS[evt.user_id][first_iid] = ItemStatus.ACTIVE.value
+        else:
+            for iid, rec in USER_INTERACTIONS[evt.user_id].items():
+                if iid != keep and rec["status"] == ItemStatus.ACTIVE.value:
+                    rec["status"] = ItemStatus.PENDING.value
+                    USER_ITEM_STATUS.setdefault(evt.user_id, {})
+                    USER_ITEM_STATUS[evt.user_id][iid] = ItemStatus.PENDING.value
 
     write_user_feed_csv(evt.user_id)
     return {"ok": True}
