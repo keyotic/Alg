@@ -553,11 +553,12 @@ def rebuild_csv_state(uid: str):
     pending = USER_PENDING_ROWS.get(uid, [])
     active_id = active["item"]["item_id"] if active else None
     history_ids = {r["item"]["item_id"] for r in history_rows}
+
+    filtered_pending = []
     seen_ids = set(history_ids)
     if active_id:
         seen_ids.add(active_id)
 
-    filtered_pending = []
     for rec in pending:
         item_id = rec["item"]["item_id"]
         if item_id in seen_ids:
