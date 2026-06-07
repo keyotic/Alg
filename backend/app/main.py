@@ -548,6 +548,7 @@ def rebuild_csv_state(uid: str):
     rows.extend([r.copy() for r in pending])
 
     for i, row in enumerate(rows, start=1):
+        if row["status"] != ItemStatus.ACTIVE.value:
         row["position"] = i
 
     USER_ITEM_STATUS.setdefault(uid, {})
