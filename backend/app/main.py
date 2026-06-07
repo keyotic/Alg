@@ -51,8 +51,7 @@ USER_HISTORY = {}
 USER_CURRENT_FEED = {}
 USER_FEED_INDEX = {}
 USER_ITEM_STATUS = {}
-USER_FEED_RECORDS = {}
-
+USER_INTERACTIONS = {}
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
 
@@ -141,22 +140,22 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
-def ensure_record(uid: str, item: dict):
-    USER_FEED_RECORDS.setdefault(uid, {})
+def upsert_interaction(uid: str, item: dict):
+    USER_INTERACTIONS.setdefault(uid, {})
     item_id = item["item_id"]
-    if item_id not in USER_FEED_RECORDS[uid]:
-        USER_FEED_RECORDS[uid][item_id] = {
+    if item_id not in USER_INTERACTIONS[uid]:
+        USER_INTERACTIONS[uid][item_id] = {
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
-            "position": len(USER_FEED_RECORDS[uid]) + 1,
+            "position": len(USER_INTERACTIONS[uid]) + 1,
             "first_seen_at": time.time(),
         }
 
 
 def set_item_status(uid: str, item_id: str, status: ItemStatus):
-    USER_FEED_RECORDS.setdefault(uid, {})
-    if item_id in USER_FEED_RECORDS[uid]:
-        USER_FEED_RECORDS[uid][item_id]["status"] = status.value
+    USER_INTERACTIONS.setdefault(uid, {})
+    if item_id in USER_INTERACTIONS[uid]:
+        USER_INTERACTIONS[uid][item_id]["status"] = status.value
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid][item_id] = status.value
 
@@ -530,35 +529,73 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
     ]
 
 
+def refresh_pending_with_new_feed(uid: str, new_items: list):
+    USER_INTERACTIONS.setdefault(uid, {})
+    existing = USER_INTERACTIONS[uid]
+
+    active_id = None
+    for iid, rec in existing.items():
+        if rec["status"] == ItemStatus.ACTIVE.value:
+            active_id = iid
+            break
+
+    for iid, rec in list(existing.items()):
+        if rec["status"] == ItemStatus.PENDING.value:
+            existing.pop(iid, None)
+            USER_ITEM_STATUS.get(uid, {}).pop(iid, None)
+
+    for idx, item in enumerate(new_items):
+        item_id = item["item_id"]
+        if item_id in existing:
+            if existing[item_id]["status"] == ItemStatus.PENDING.value:
+                existing[item_id]["item"] = item.copy()
+            continue
+        existing[item_id] = {
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": len(existing) + 1,
+            "first_seen_at": time.time(),
+        }
+
+    if active_id is None and new_items:
+        first_id = new_items[0]["item_id"]
+        if first_id in existing:
+            existing[first_id]["status"] = ItemStatus.ACTIVE.value
+            USER_ITEM_STATUS.setdefault(uid, {})
+            USER_ITEM_STATUS[uid][first_id] = ItemStatus.ACTIVE.value
+
+
 def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
-    stored_feed = USER_CURRENT_FEED.get(uid)
-    if not stored_feed:
+    records = USER_INTERACTIONS.get(uid, {})
+    if not records:
         return []
 
-    current_idx = USER_FEED_INDEX.get(uid, 0)
-    feed_slice = stored_feed[current_idx:] if include_active else stored_feed[current_idx + 1:]
-    feed_slice = feed_slice[:limit]
+    ordered = list(records.values())
+    if include_active:
+        feed_slice = ordered
+    else:
+        feed_slice = [r for r in ordered if r["status"] != ItemStatus.ACTIVE.value]
 
     annotated = []
-    for i, item in enumerate(feed_slice):
-        item = item.copy()
-        item["position"] = current_idx + i + 1
-        item["is_active"] = (i == 0)
+    for rec in feed_slice[:limit]:
+        item = rec["item"].copy()
+        item["position"] = rec["position"]
+        item["status"] = rec["status"]
+        item["is_active"] = rec["status"] == ItemStatus.ACTIVE.value
         annotated.append(item)
 
     return annotated
 
 
 def write_user_feed_csv(uid: str):
-    records = USER_FEED_RECORDS.get(uid, {})
+    records = USER_INTERACTIONS.get(uid, {})
     lines = ["position,status,item_id,title"]
-    for rec in records.values():
+    ordered = sorted(records.values(), key=lambda r: r["position"])
+    for rec in ordered:
         item = rec["item"]
         item_id = str(item.get("item_id", "")).replace('"', '""')
         title = str(item.get("title", "")).replace('"', '""')
-        status = rec["status"]
-        position = rec["position"]
-        lines.append(f'{position},{status},"{item_id}","{title}"')
+        lines.append(f'{rec["position"]},{rec["status"]},"{item_id}","{title}"')
 
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines))
@@ -576,14 +613,12 @@ def feed(req: FeedRequest):
         )
         USER_CURRENT_FEED[req.user_id] = items
         USER_ITEM_STATUS.setdefault(req.user_id, {})
-        USER_FEED_RECORDS.setdefault(req.user_id, {})
-        for idx, item in enumerate(items):
-            ensure_record(req.user_id, item)
-            if idx == 0:
-                set_item_status(req.user_id, item["item_id"], ItemStatus.ACTIVE)
-            else:
-                if get_item_status(req.user_id, item["item_id"]) == ItemStatus.PENDING.value:
-                    set_item_status(req.user_id, item["item_id"], ItemStatus.PENDING)
+        USER_INTERACTIONS.setdefault(req.user_id, {})
+        for item in items:
+            upsert_interaction(req.user_id, item)
+        if items:
+            first_id = items[0]["item_id"]
+            set_item_status(req.user_id, first_id, ItemStatus.ACTIVE)
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         write_user_feed_csv(req.user_id)
         return {"items": clean}
@@ -599,14 +634,6 @@ def advance(req: Advance):
     for i, item in enumerate(stored_feed):
         if item.get("item_id") == req.item_id:
             USER_FEED_INDEX[req.user_id] = i
-            for j, other in enumerate(stored_feed):
-                oid = other.get("item_id")
-                if oid in USER_FEED_RECORDS.get(req.user_id, {}):
-                    if j == i and get_item_status(req.user_id, oid) == ItemStatus.PENDING.value:
-                        set_item_status(req.user_id, oid, ItemStatus.ACTIVE)
-                    elif j > i and get_item_status(req.user_id, oid) == ItemStatus.PENDING.value:
-                        set_item_status(req.user_id, oid, ItemStatus.PENDING)
-            write_user_feed_csv(req.user_id)
             return {"ok": True}
     return {"ok": True}
 
@@ -630,13 +657,22 @@ def interactions(evt: Interaction):
     set_item_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    stored_feed = USER_CURRENT_FEED.get(evt.user_id, [])
-    current_idx = USER_FEED_INDEX.get(evt.user_id, 0)
-    if 0 <= current_idx < len(stored_feed):
-        current_id = stored_feed[current_idx].get("item_id")
-        if current_id == evt.item_id and current_idx + 1 < len(stored_feed):
-            next_id = stored_feed[current_idx + 1].get("item_id")
-            set_item_status(evt.user_id, next_id, ItemStatus.ACTIVE)
+    current_records = USER_INTERACTIONS.get(evt.user_id, {})
+    if evt.item_id in current_records:
+        current_records[evt.item_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+
+    fresh = build_feed_items(
+        uid=evt.user_id,
+        limit=5,
+        exclude_seen=True,
+        include_debug=True
+    )
+    refresh_pending_with_new_feed(evt.user_id, fresh)
+
+    pending = [r for r in USER_INTERACTIONS.get(evt.user_id, {}).values() if r["status"] == ItemStatus.PENDING.value]
+    if pending:
+        next_id = sorted(pending, key=lambda r: r["position"])[0]["item"]["item_id"]
+        set_item_status(evt.user_id, next_id, ItemStatus.ACTIVE)
 
     write_user_feed_csv(evt.user_id)
     return {"ok": True}
@@ -670,7 +706,7 @@ def reset(req: ResetRequest):
     USER_CURRENT_FEED.pop(req.user_id, None)
     USER_FEED_INDEX.pop(req.user_id, None)
     USER_ITEM_STATUS.pop(req.user_id, None)
-    USER_FEED_RECORDS.pop(req.user_id, None)
+    USER_INTERACTIONS.pop(req.user_id, None)
 
     if LAST_ACTIVE_USER == req.user_id:
         LAST_ACTIVE_USER = None
@@ -819,9 +855,10 @@ def admin_feed_csv():
     if not LAST_ACTIVE_USER:
         content = "position,status,item_id,title\n"
     else:
-        records = USER_FEED_RECORDS.get(LAST_ACTIVE_USER, {})
+        records = USER_INTERACTIONS.get(LAST_ACTIVE_USER, {})
         lines = ["position,status,item_id,title"]
-        for rec in records.values():
+        ordered = sorted(records.values(), key=lambda r: r["position"])
+        for rec in ordered:
             item = rec["item"]
             item_id = str(item.get("item_id", "")).replace('"', '""')
             title = str(item.get("title", "")).replace('"', '""')
