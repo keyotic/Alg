@@ -110,7 +110,7 @@ function ActionButtons({ onSkip, onLike, dragX = 0, disabled = false }) {
         justifyContent: "center",
         width: 1034,
         marginLeft: "-61em",
-        marginTop: -10,
+        marginTop: -200,
       }}
     >
       <button
@@ -307,6 +307,7 @@ export default function App() {
                     top: isTop ? "auto" : 0,
                     left: isTop ? "auto" : 0,
                     zIndex: 100 - index,
+                    marginTop: "100px",
                     transform: isTop
                       ? "none"
                       : `translateY(${index * 14}px) scale(${1 - index * 0.03})`,
@@ -356,7 +357,7 @@ export default function App() {
                 backgroundColor: "#00000000",
                 overflow: "hidden",
                 border: "5px solid #ffffff",
-                marginTop: "-8em",
+                marginTop: -50,
               }}
             >
               <div

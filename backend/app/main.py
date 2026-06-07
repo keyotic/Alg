@@ -2,6 +2,7 @@ import os, json, time
 import traceback
 import numpy as np
 import faiss
+import csv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel
@@ -9,29 +10,20 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-
-
-
 # Go TWO levels up: backend/app/main.py -> backend/app -> backend -> AlgorithmCode (root)
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
-
-
-
 ROOT_ARTIFACTS = os.path.join(PROJECT_ROOT, "artifacts")
 ROOT_DATA = os.path.join(PROJECT_ROOT, "data")
-
-
-
+ROOT_OUTPUT = os.path.join(PROJECT_ROOT, "output")
+os.makedirs(ROOT_OUTPUT, exist_ok=True)
 
 INDEX_PATH = os.getenv("INDEX_PATH", os.path.join(ROOT_ARTIFACTS, "faiss.index"))
 IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
-
-
-
+CSV_PATH = os.getenv("CSV_PATH", os.path.join(ROOT_OUTPUT, "current_feed.csv"))
 
 # Load FAISS + metadata on startup
 index = faiss.read_index(INDEX_PATH)
@@ -41,43 +33,27 @@ ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
-
-
-
-# Log orphaned IDs at startup — do NOT filter ITEM_IDS/ITEM_VECS
-# as FAISS row indices must stay perfectly aligned with ITEM_IDS
 orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
 if orphans:
     print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
 
-
-
-
 EMBED_DIM = ITEM_VECS.shape[1]
-
-
-
 
 # In-memory user vectors & seen set for demo
 USER_VEC = {}   # user_id -> np.array (d,)
 USER_SEEN = {}  # user_id -> set(item_id)
 
-
-
 # Admin/debug tracking
-USER_HISTORY = {}       # user_id -> list of {"item_id": str, "action": str, "ts": float}
-USER_CURRENT_FEED = {}  # user_id -> list of item dicts (the live batch from last /feed call)
-USER_FEED_INDEX = {}    # user_id -> int (index of the item currently on screen)
+USER_HISTORY = {}        # user_id -> list of {"item_id": str, "action": str, "ts": float}
+USER_CURRENT_FEED = {}   # user_id -> list of item dicts (the live batch from last /feed call)
+USER_FEED_INDEX = {}     # user_id -> int (index of the item currently on screen)
+USER_ITEM_STATUS = {}    # user_id -> {item_id: "pending"|"liked"|"skipped"}
+
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
 
-
-
-
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
-
-
 
 
 class FeedRequest(BaseModel):
@@ -86,14 +62,10 @@ class FeedRequest(BaseModel):
     exclude_seen: bool = True
 
 
-
-
 class Interaction(BaseModel):
     user_id: str
     item_id: str
     action: str   # "like" or "skip"
-
-
 
 
 class Advance(BaseModel):
@@ -101,22 +73,12 @@ class Advance(BaseModel):
     item_id: str  # the item NOW on screen
 
 
-
-
 class ResetRequest(BaseModel):
     user_id: str
 
 
-
-
 app = FastAPI()
 
-
-
-
-# Exception middleware — MUST be added BEFORE CORSMiddleware
-# Ensures 500 errors still return CORS headers so the browser
-# can read the actual error message instead of a generic "Network Error"
 @app.middleware("http")
 async def catch_exceptions(request: Request, call_next):
     try:
@@ -129,10 +91,6 @@ async def catch_exceptions(request: Request, call_next):
             headers={"Access-Control-Allow-Origin": "*"},
         )
 
-
-
-
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -141,13 +99,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
-
-# Serve images
 app.mount("/images", StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")), name="images")
-
-
 
 
 @app.get("/healthz")
@@ -155,38 +107,26 @@ def healthz():
     return {"ok": True, "count": len(ITEM_IDS)}
 
 
-
-
 def get_user_vec(uid: str):
     return USER_VEC.get(uid, None)
-
-
 
 
 def set_user_vec(uid: str, v):
     USER_VEC[uid] = v
 
 
-
-
 def mark_seen(uid: str, item_id: str):
     USER_SEEN.setdefault(uid, set()).add(item_id)
-
-
 
 
 def has_seen(uid: str, item_id: str):
     return item_id in USER_SEEN.get(uid, set())
 
 
-
-
 def mark_active(uid: str):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
     LAST_ACTIVE_USER = uid
     LAST_ACTIVITY_AT = time.time()
-
-
 
 
 def log_interaction(uid: str, item_id: str, action: str):
@@ -197,6 +137,12 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
+def set_item_status(uid: str, item_id: str, status: str):
+    USER_ITEM_STATUS.setdefault(uid, {})[item_id] = status
+
+
+def get_item_status(uid: str, item_id: str):
+    return USER_ITEM_STATUS.get(uid, {}).get(item_id, "pending")
 
 
 def get_fortune_state(uid: str):
@@ -204,11 +150,9 @@ def get_fortune_state(uid: str):
     likes = [h for h in history if h["action"] == "like"]
     skips = [h for h in history if h["action"] == "skip"]
 
-
     like_count = len(likes)
     skip_count = len(skips)
     total = like_count + skip_count
-
 
     if total <= 1:
         return {
@@ -224,17 +168,15 @@ def get_fortune_state(uid: str):
                 "\"A hidden opportunity waits for you to make the first move.\"",
                 "\"The first sign is subtle… yet it will lead you somewhere rare.\"",
                 "\"What feels distant now… will soon draw unexpectedly close.\"",
-                "\"A quiet beginning is shaping a far greater destiny.\""
+                "\"A quiet beginning is shaping a far greater destiny.\"",
                 "\"Something small is already shifting in your favor.\"",
                 "\"The answer has not appeared… but the pattern has begun.\"",
                 "\"A new path opens the moment you decide to notice it.\""
             ]
         }
 
-
     like_ratio = like_count / total
     skip_ratio = skip_count / total
-
 
     if like_count >= 12 and like_ratio >= 0.7:
         return {
@@ -255,7 +197,7 @@ def get_fortune_state(uid: str):
                 "\"You are not waiting for the future. You are pulling it toward you.\"",
                 "\"A single fearless choice will set something powerful in motion.\"",
                 "\"You trust your instincts… and they are already aligning things in your favor.\"",
-                "\"What you claim without doubt… will begin to shape itself around you.\""
+                "\"What you claim without doubt… will begin to shape itself around you.\"",
                 "\"Opportunity recognizes your certainty… and moves closer because of it.\"",
                 "\"You are closer than you think… to something worth the risk.\"",
                 "\"Your momentum is building… and it will soon carry you further than expected.\"",
@@ -281,7 +223,7 @@ def get_fortune_state(uid: str):
                 "\"You are not missing out. You are refining what truly belongs to you.\"",
                 "\"By filtering the noise, you are making room for something rare.\"",
                 "\"What you release now… creates space for something more precise.\"",
-                "\"Your standards are rising… and your path is adjusting to match.\""
+                "\"Your standards are rising… and your path is adjusting to match.\"",
                 "\"You see what others overlook… and that awareness will guide you forward.\"",
                 "\"By choosing less… you are preparing to receive more of what matters.\"",
                 "\"Your patience is not empty… it is quietly aligning things in your favor.\"",
@@ -307,7 +249,7 @@ def get_fortune_state(uid: str):
                 "\"You are gathering signals from the future through what draws you in today.\"",
                 "\"A joyful instinct will soon prove wiser than logic alone.\"",
                 "\"Curiosity is guiding you… and it is leading somewhere worth arriving.\"",
-                "\"What you choose with lightness… will quietly shape something meaningful.\""
+                "\"What you choose with lightness… will quietly shape something meaningful.\"",
                 "\"You are following a feeling… and it is closer to truth than it seems.\"",
                 "\"Your attention is shifting… and new doors are adjusting to meet it.\"",
                 "\"The things that spark interest now… will soon begin to connect.\"",
@@ -350,7 +292,7 @@ def get_fortune_state(uid: str):
             "skip_ratio": skip_ratio,
             "pool": [
                 "\"You balance instinct and caution with rare precision. A meaningful choice is approaching.\"",
-                "\"You move carefully, but without fear… and that balance will serve you well\"",
+                "\"You move carefully, but without fear… and that balance will serve you well.\"",
                 "\"You are learning not only what you want, but why. That knowledge will shape your next chapter.\"",
                 "\"You stand between desire and discernment, and that is where wisdom grows.\"",
                 "\"A balanced heart often sees what others overlook.\"",
@@ -359,7 +301,7 @@ def get_fortune_state(uid: str):
                 "\"Your future is being built on thoughtful tension, and that makes it resilient.\"",
                 "\"The harmony between your curiosity and caution will soon reveal a clear answer.\"",
                 "\"You are holding both paths in view… and clarity is beginning to settle.\"",
-                "\"Balance is guiding you… quietly aligning your next decision.\""
+                "\"Balance is guiding you… quietly aligning your next decision.\"",
                 "\"You are neither rushing nor resisting… and that is shaping something steady.\"",
                 "\"Your awareness of both risks and rewards… will soon reveal the right moment.\"",
                 "\"You are finding center… and from there, your direction will strengthen.\"",
@@ -368,28 +310,20 @@ def get_fortune_state(uid: str):
         }
 
 
-
-
 def get_preview_fortune(uid: str):
     state = get_fortune_state(uid)
     pool = state["pool"]
     total = state["total"]
 
-
     if not pool:
         return None
-
 
     idx = min(total, len(pool) - 1)
     return pool[idx]
 
 
-
-
 def generate_personalized_fortune(uid: str):
     return get_preview_fortune(uid)
-
-
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -405,8 +339,6 @@ def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 
         u /= np.linalg.norm(u) + 1e-8
     USER_VEC[uid] = u
     return u
-
-
 
 
 def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk: int):
@@ -427,22 +359,17 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
     return scored[:topk]
 
 
-
-
 def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0.7):
     selected = []
     selected_vecs = []
     cand_items = [(item_id, score, row_idx) for (item_id, score, row_idx) in candidates]
 
-
     if not cand_items:
         return []
-
 
     first = cand_items[0]
     selected.append(first)
     selected_vecs.append(ITEM_VECS[first[2]])
-
 
     while len(selected) < min(topn, len(cand_items)):
         best_idx = None
@@ -467,8 +394,6 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
     return selected
 
 
-
-
 def convert_path_to_url(item):
     result = item.copy()
     if result["path"].startswith("data/"):
@@ -476,8 +401,6 @@ def convert_path_to_url(item):
         base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
         result["path"] = f"{base_url}/images/{filename}"
     return result
-
-
 
 
 def serialize_item(item_id: str, score: float = None, row_idx: int = None):
@@ -491,12 +414,9 @@ def serialize_item(item_id: str, score: float = None, row_idx: int = None):
     return result
 
 
-
-
 def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
     u = get_user_vec(uid)
     k_candidates = max(limit * 5, 100)
-
 
     if u is None:
         items = []
@@ -508,17 +428,13 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             if len(items) >= limit * 3:
                 break
 
-
         if include_debug:
             result = [serialize_item(i) for i in items[:limit]]
             return [x for x in result if x is not None]
 
-
         return [convert_path_to_url(ITEMS_META[i]) for i in items[:limit]]
 
-
     q = u.reshape(1, -1).astype("float32")
-
 
     attempts = [
         k_candidates,
@@ -527,15 +443,12 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
         len(ITEM_IDS)
     ]
 
-
     cand = []
-
 
     for attempt_k in attempts:
         attempt_k = min(attempt_k, len(ITEM_IDS))
         sims, idxes = index.search(q, attempt_k)
         idxes, sims = idxes[0], sims[0]
-
 
         cand = [
             (ITEM_IDS[i], float(sims[j]), i)
@@ -545,17 +458,14 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             and (not exclude_seen or not has_seen(uid, ITEM_IDS[i]))
         ]
 
-
         if len(cand) >= limit:
             break
-
 
     if len(cand) < limit:
         liked_seen = {
             iid for iid in USER_SEEN.get(uid, set())
             if POPULARITY.get(iid, 0.0) > 0
         }
-
 
         sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
         idxes, sims = idxes[0], sims[0]
@@ -566,7 +476,6 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             and ITEM_IDS[i] in ITEMS_META
             and ITEM_IDS[i] not in liked_seen
         ]
-
 
     if len(cand) < limit:
         already = {c[0] for c in cand}
@@ -581,10 +490,8 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             if len(cand) >= limit * 2:
                 break
 
-
     if not cand:
         return []
-
 
     scored = score_items(
         u,
@@ -594,7 +501,6 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
     )
     reranked = mmr_rerank(u, scored, limit, lam=0.7)
 
-
     if include_debug:
         result = [
             serialize_item(iid, score=score, row_idx=row_idx)
@@ -603,14 +509,11 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
         ]
         return [x for x in result if x is not None]
 
-
     return [
         convert_path_to_url(ITEMS_META[iid])
         for (iid, _, _) in reranked
         if iid in ITEMS_META
     ]
-
-
 
 
 def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
@@ -638,6 +541,25 @@ def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = Tr
     return annotated
 
 
+def write_user_feed_csv(uid: str):
+    feed = USER_CURRENT_FEED.get(uid, [])
+    current_idx = USER_FEED_INDEX.get(uid, 0)
+
+    lines = ["position,status,item_id,title"]
+    for i, item in enumerate(feed):
+        item_id = item.get("item_id", "")
+        title = item.get("title", "")
+        status = get_item_status(uid, item_id)
+
+        if i < current_idx and status == "pending":
+            status = "seen"
+
+        item_id = str(item_id).replace('"', '""')
+        title = str(title).replace('"', '""')
+        lines.append(f'{i + 1},{status},"{item_id}","{title}"')
+
+    with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(lines))
 
 
 @app.post("/feed")
@@ -651,13 +573,15 @@ def feed(req: FeedRequest):
             include_debug=True
         )
         USER_CURRENT_FEED[req.user_id] = items
+        USER_ITEM_STATUS.setdefault(req.user_id, {})
+        for item in items:
+            USER_ITEM_STATUS[req.user_id].setdefault(item["item_id"], "pending")
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
+        write_user_feed_csv(req.user_id)
         return {"items": clean}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 @app.post("/advance")
@@ -668,17 +592,15 @@ def advance(req: Advance):
     for i, item in enumerate(stored_feed):
         if item.get("item_id") == req.item_id:
             USER_FEED_INDEX[req.user_id] = i
+            write_user_feed_csv(req.user_id)
             return {"ok": True}
 
     return {"ok": True}
 
 
-
-
 @app.post("/interactions")
 def interactions(evt: Interaction):
     mark_active(evt.user_id)
-
 
     if evt.action not in ("like", "skip"):
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -687,18 +609,16 @@ def interactions(evt: Interaction):
     except ValueError:
         raise HTTPException(status_code=404, detail="Unknown item_id")
 
-
     item_vec = ITEM_VECS[row_idx]
     like = (evt.action == "like")
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
+    set_item_status(evt.user_id, evt.item_id, "liked" if like else "skipped")
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
-
+    write_user_feed_csv(evt.user_id)
 
     return {"ok": True}
-
-
 
 
 @app.get("/fortune/{user_id}")
@@ -719,28 +639,22 @@ def get_fortune(user_id: str):
     }
 
 
-
-
 @app.post("/reset")
 def reset(req: ResetRequest):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
-
 
     USER_VEC.pop(req.user_id, None)
     USER_SEEN.pop(req.user_id, None)
     USER_HISTORY.pop(req.user_id, None)
     USER_CURRENT_FEED.pop(req.user_id, None)
     USER_FEED_INDEX.pop(req.user_id, None)
-
+    USER_ITEM_STATUS.pop(req.user_id, None)
 
     if LAST_ACTIVE_USER == req.user_id:
         LAST_ACTIVE_USER = None
         LAST_ACTIVITY_AT = 0.0
 
-
     return {"ok": True}
-
-
 
 
 @app.get("/admin/users")
@@ -763,8 +677,6 @@ def admin_users():
     }
 
 
-
-
 @app.get("/admin/user/{user_id}")
 def admin_user_detail(user_id: str):
     history = USER_HISTORY.get(user_id, [])
@@ -772,7 +684,6 @@ def admin_user_detail(user_id: str):
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(user_id)
     current_feed = get_current_feed_preview(user_id, limit=8, include_active=True)
-
 
     return {
         "user_id": user_id,
@@ -792,9 +703,8 @@ def admin_user_detail(user_id: str):
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
         "current_feed": current_feed,
+        "item_status": USER_ITEM_STATUS.get(user_id, {}),
     }
-
-
 
 
 @app.get("/admin/current-user")
@@ -817,8 +727,8 @@ def admin_current_user():
             "fortune_like_ratio": 0.0,
             "fortune_skip_ratio": 0.0,
             "current_feed": [],
+            "item_status": {},
         }
-
 
     uid = LAST_ACTIVE_USER
     history = USER_HISTORY.get(uid, [])
@@ -826,7 +736,6 @@ def admin_current_user():
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(uid)
     current_feed = get_current_feed_preview(uid, limit=8, include_active=True)
-
 
     return {
         "active_user": uid,
@@ -845,9 +754,8 @@ def admin_current_user():
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
         "current_feed": current_feed,
+        "item_status": USER_ITEM_STATUS.get(uid, {}),
     }
-
-
 
 
 @app.get("/admin/popularity")
@@ -862,16 +770,12 @@ def admin_popularity():
     }
 
 
-
-
 @app.get("/admin/current-feed/{user_id}")
 def admin_current_feed(user_id: str, limit: int = 8):
     return {
         "user_id": user_id,
         "current_feed": get_current_feed_preview(user_id, limit=limit, include_active=True)
     }
-
-
 
 
 @app.post("/admin/preview-feed/{user_id}")
@@ -885,8 +789,6 @@ def admin_preview_feed(user_id: str, limit: int = 15):
     return {"items": items}
 
 
-
-
 @app.get("/admin/feed.csv")
 def admin_feed_csv():
     if not LAST_ACTIVE_USER:
@@ -895,9 +797,9 @@ def admin_feed_csv():
         items = get_current_feed_preview(LAST_ACTIVE_USER, limit=15, include_active=True)
         lines = ["#,status,item_id,title"]
         for item in items:
-            status  = "ACTIVE" if item.get("is_active") else f"next {(item.get('position', 1) - 1)}"
+            status = "ACTIVE" if item.get("is_active") else f"next {(item.get('position', 1) - 1)}"
             item_id = str(item.get("item_id", "")).replace('"', '""')
-            title   = str(item.get("title",   "")).replace('"', '""')
+            title = str(item.get("title", "")).replace('"', '""')
             lines.append(f'{item.get("position", "")},{status},"{item_id}","{title}"')
         content = "\n".join(lines)
     return Response(
