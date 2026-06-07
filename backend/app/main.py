@@ -536,9 +536,6 @@ def refresh_pending_rows(uid: str, new_items: list):
 
 def rebuild_csv_state(uid: str):
     rows = []
-    history = USER_HISTORY_ROWS.get(uid, {})
-    for rec in sorted(history.values(), key=lambda r: r["ts"]):
-        rows.append(rec.copy())
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
