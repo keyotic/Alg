@@ -21,15 +21,6 @@
       --active-bg: #f0fdf4;
       --active-border: #bfe8cf;
       --active-text: #0b6b3a;
-      --pending-bg: #f8fafc;
-      --pending-border: #d9deea;
-      --pending-text: #5f6b85;
-      --liked-bg: #e8f7ef;
-      --liked-border: #bfe8cf;
-      --liked-text: #0b6b3a;
-      --skipped-bg: #fff4df;
-      --skipped-border: #efd39c;
-      --skipped-text: #8a5a10;
     }
 
     * { box-sizing: border-box; }
@@ -219,6 +210,7 @@
     th { background: #f3f6fb; }
     td code { font-family: Consolas, monospace; font-size: 13px; word-break: break-word; }
 
+    /* Active item row highlight */
     tr.active-row { background: var(--active-bg) !important; }
     tr.active-row td { border-color: var(--active-border); }
 
@@ -261,13 +253,10 @@
       font-size: 12px;
       font-weight: bold;
       border: 1px solid transparent;
-      text-transform: lowercase;
     }
 
-    .pill.active { color: var(--active-text); background: var(--active-bg); border-color: var(--active-border); }
-    .pill.pending { color: var(--pending-text); background: var(--pending-bg); border-color: var(--pending-border); }
-    .pill.like { color: var(--liked-text); background: var(--liked-bg); border-color: var(--liked-border); }
-    .pill.skip { color: var(--skipped-text); background: var(--skipped-bg); border-color: var(--skipped-border); }
+    .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
+    .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
 
     .thumb {
       width: 56px;
@@ -278,12 +267,6 @@
       background: #f3f6fb;
     }
 
-    .item-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
 
     @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
@@ -388,14 +371,14 @@
 
     <div class="section">
       <h2>Current Feed</h2>
-      <p class="muted">The first row is the item currently being shown to the active user. The rows below remain queued or completed, with status shown directly from the backend.</p>
+      <p class="muted">The first row is the item currently being shown to the active user. The rows below are queued next. Watch this update live after each interaction.</p>
       <div class="scroll">
         <table id="currentFeedTable">
           <thead>
             <tr>
               <th>#</th>
               <th>Status</th>
-              <th>Item</th>
+              <th>Item ID</th>
               <th>Title</th>
             </tr>
           </thead>
@@ -523,9 +506,25 @@
       return `${Math.round(value * 100)}%`;
     }
 
+    function formatScore(value) {
+      if (typeof value !== "number" || Number.isNaN(value)) return "—";
+      return value.toFixed(4);
+    }
+
     function formatTimestamp(ts) {
       if (!ts) return "";
       return new Date(ts * 1000).toLocaleString();
+    }
+
+    function createThumb(path, title) {
+      const img = document.createElement("img");
+      img.className = "thumb";
+      img.src = path || "";
+      img.alt = title || "Preview image";
+      img.loading = "lazy";
+      img.referrerPolicy = "no-referrer";
+      img.onerror = () => { img.style.display = "none"; };
+      return img;
     }
 
     function createActiveBadge() {
@@ -538,11 +537,12 @@
       return badge;
     }
 
-    function createStatusBadge(status) {
-      const pill = document.createElement("span");
-      pill.className = `pill ${status}`;
-      pill.textContent = status;
-      return pill;
+    function createNextLabel(position) {
+      const span = document.createElement("span");
+      span.className = "muted";
+      span.style.fontSize = "12px";
+      span.textContent = `Next ${position - 1}`;
+      return span;
     }
 
     function setSummary(data) {
@@ -634,44 +634,29 @@
 
     function renderCurrentFeed(items) {
       if ((items || []).length) {
-        items.forEach((item, idx) => {
-          const status = String(item.status || (item.is_active ? "active" : "pending")).toLowerCase();
-          const position = item.position ?? (idx + 1);
+        items.forEach((item) => {
+          const isActive = item.is_active === true;
+          const position = item.position ?? (items.indexOf(item) + 1);
+
 
           const statusCell = document.createElement("div");
-          if (status === "active") {
+          if (isActive) {
             statusCell.appendChild(createActiveBadge());
           } else {
-            statusCell.appendChild(createStatusBadge(status));
+            statusCell.appendChild(createNextLabel(position));
           }
-
-          const itemCell = document.createElement("div");
-          itemCell.className = "item-title";
-
-          if (item.path) {
-            itemCell.appendChild(createThumb(item.path, item.title || item.item_id));
-          }
-
-          const textWrap = document.createElement("div");
-          textWrap.innerHTML = "";
-          textWrap.appendChild(document.createTextNode(item.item_id || "—"));
-          if (item.score !== undefined) {
-            const score = document.createElement("div");
-            score.className = "muted";
-            score.style.fontSize = "12px";
-            score.textContent = `score: ${typeof item.score === "number" ? item.score.toFixed(4) : item.score}`;
-            textWrap.appendChild(score);
-          }
-          itemCell.appendChild(textWrap);
 
           const titleWrap = document.createElement("div");
+          titleWrap.className = "title-cell";
           titleWrap.textContent = item.title || "—";
+
+          
 
           addRow(
             "currentFeedTable",
-            [position, statusCell, itemCell, titleWrap],
+            [position, statusCell, item.item_id || "", titleWrap],
             false,
-            status === "active" ? "active-row" : null
+            isActive ? "active-row" : null
           );
         });
       } else {
