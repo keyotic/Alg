@@ -1,16 +1,17 @@
-import os, json, time
+import os
+import json
+import time
 import traceback
 import numpy as np
 import faiss
-import csv
+from enum import Enum
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-# Go TWO levels up: backend/app/main.py -> backend/app -> backend -> AlgorithmCode (root)
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
@@ -25,11 +26,10 @@ VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vect
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
 CSV_PATH = os.getenv("CSV_PATH", os.path.join(ROOT_OUTPUT, "current_feed.csv"))
 
-# Load FAISS + metadata on startup
 index = faiss.read_index(INDEX_PATH)
 with open(IDS_PATH, "r") as f:
     ITEM_IDS = json.load(f)
-ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
+ITEM_VECS = np.load(VECTORS_PATH)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
@@ -39,15 +39,19 @@ if orphans:
 
 EMBED_DIM = ITEM_VECS.shape[1]
 
-# In-memory user vectors & seen set for demo
-USER_VEC = {}   # user_id -> np.array (d,)
-USER_SEEN = {}  # user_id -> set(item_id)
+class ItemStatus(str, Enum):
+    ACTIVE = "active"
+    PENDING = "pending"
+    LIKED = "liked"
+    SKIPPED = "skipped"
 
-# Admin/debug tracking
-USER_HISTORY = {}        # user_id -> list of {"item_id": str, "action": str, "ts": float}
-USER_CURRENT_FEED = {}   # user_id -> list of item dicts (the live batch from last /feed call)
-USER_FEED_INDEX = {}     # user_id -> int (index of the item currently on screen)
-USER_ITEM_STATUS = {}    # user_id -> {item_id: "pending"|"liked"|"skipped"}
+USER_VEC = {}
+USER_SEEN = {}
+USER_HISTORY = {}
+USER_CURRENT_FEED = {}
+USER_FEED_INDEX = {}
+USER_ITEM_STATUS = {}
+USER_FEED_RECORDS = {}
 
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
@@ -65,12 +69,12 @@ class FeedRequest(BaseModel):
 class Interaction(BaseModel):
     user_id: str
     item_id: str
-    action: str   # "like" or "skip"
+    action: str
 
 
 class Advance(BaseModel):
     user_id: str
-    item_id: str  # the item NOW on screen
+    item_id: str
 
 
 class ResetRequest(BaseModel):
@@ -137,12 +141,28 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
-def set_item_status(uid: str, item_id: str, status: str):
-    USER_ITEM_STATUS.setdefault(uid, {})[item_id] = status
+def ensure_record(uid: str, item: dict):
+    USER_FEED_RECORDS.setdefault(uid, {})
+    item_id = item["item_id"]
+    if item_id not in USER_FEED_RECORDS[uid]:
+        USER_FEED_RECORDS[uid][item_id] = {
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": len(USER_FEED_RECORDS[uid]) + 1,
+            "first_seen_at": time.time(),
+        }
+
+
+def set_item_status(uid: str, item_id: str, status: ItemStatus):
+    USER_FEED_RECORDS.setdefault(uid, {})
+    if item_id in USER_FEED_RECORDS[uid]:
+        USER_FEED_RECORDS[uid][item_id]["status"] = status.value
+    USER_ITEM_STATUS.setdefault(uid, {})
+    USER_ITEM_STATUS[uid][item_id] = status.value
 
 
 def get_item_status(uid: str, item_id: str):
-    return USER_ITEM_STATUS.get(uid, {}).get(item_id, "pending")
+    return USER_ITEM_STATUS.get(uid, {}).get(item_id, ItemStatus.PENDING.value)
 
 
 def get_fortune_state(uid: str):
@@ -436,13 +456,7 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 
     q = u.reshape(1, -1).astype("float32")
 
-    attempts = [
-        k_candidates,
-        k_candidates * 3,
-        k_candidates * 10,
-        len(ITEM_IDS)
-    ]
-
+    attempts = [k_candidates, k_candidates * 3, k_candidates * 10, len(ITEM_IDS)]
     cand = []
 
     for attempt_k in attempts:
@@ -518,17 +532,11 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 
 def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
     stored_feed = USER_CURRENT_FEED.get(uid)
-
     if not stored_feed:
         return []
 
     current_idx = USER_FEED_INDEX.get(uid, 0)
-
-    if include_active:
-        feed_slice = stored_feed[current_idx:]
-    else:
-        feed_slice = stored_feed[current_idx + 1:]
-
+    feed_slice = stored_feed[current_idx:] if include_active else stored_feed[current_idx + 1:]
     feed_slice = feed_slice[:limit]
 
     annotated = []
@@ -542,21 +550,15 @@ def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = Tr
 
 
 def write_user_feed_csv(uid: str):
-    feed = USER_CURRENT_FEED.get(uid, [])
-    current_idx = USER_FEED_INDEX.get(uid, 0)
-
+    records = USER_FEED_RECORDS.get(uid, {})
     lines = ["position,status,item_id,title"]
-    for i, item in enumerate(feed):
-        item_id = item.get("item_id", "")
-        title = item.get("title", "")
-        status = get_item_status(uid, item_id)
-
-        if i < current_idx and status == "pending":
-            status = "seen"
-
-        item_id = str(item_id).replace('"', '""')
-        title = str(title).replace('"', '""')
-        lines.append(f'{i + 1},{status},"{item_id}","{title}"')
+    for rec in records.values():
+        item = rec["item"]
+        item_id = str(item.get("item_id", "")).replace('"', '""')
+        title = str(item.get("title", "")).replace('"', '""')
+        status = rec["status"]
+        position = rec["position"]
+        lines.append(f'{position},{status},"{item_id}","{title}"')
 
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines))
@@ -574,8 +576,14 @@ def feed(req: FeedRequest):
         )
         USER_CURRENT_FEED[req.user_id] = items
         USER_ITEM_STATUS.setdefault(req.user_id, {})
-        for item in items:
-            USER_ITEM_STATUS[req.user_id].setdefault(item["item_id"], "pending")
+        USER_FEED_RECORDS.setdefault(req.user_id, {})
+        for idx, item in enumerate(items):
+            ensure_record(req.user_id, item)
+            if idx == 0:
+                set_item_status(req.user_id, item["item_id"], ItemStatus.ACTIVE)
+            else:
+                if get_item_status(req.user_id, item["item_id"]) == ItemStatus.PENDING.value:
+                    set_item_status(req.user_id, item["item_id"], ItemStatus.PENDING)
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         write_user_feed_csv(req.user_id)
         return {"items": clean}
@@ -587,14 +595,19 @@ def feed(req: FeedRequest):
 @app.post("/advance")
 def advance(req: Advance):
     mark_active(req.user_id)
-
     stored_feed = USER_CURRENT_FEED.get(req.user_id, [])
     for i, item in enumerate(stored_feed):
         if item.get("item_id") == req.item_id:
             USER_FEED_INDEX[req.user_id] = i
+            for j, other in enumerate(stored_feed):
+                oid = other.get("item_id")
+                if oid in USER_FEED_RECORDS.get(req.user_id, {}):
+                    if j == i and get_item_status(req.user_id, oid) == ItemStatus.PENDING.value:
+                        set_item_status(req.user_id, oid, ItemStatus.ACTIVE)
+                    elif j > i and get_item_status(req.user_id, oid) == ItemStatus.PENDING.value:
+                        set_item_status(req.user_id, oid, ItemStatus.PENDING)
             write_user_feed_csv(req.user_id)
             return {"ok": True}
-
     return {"ok": True}
 
 
@@ -614,10 +627,18 @@ def interactions(evt: Interaction):
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
-    set_item_status(evt.user_id, evt.item_id, "liked" if like else "skipped")
+    set_item_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
-    write_user_feed_csv(evt.user_id)
 
+    stored_feed = USER_CURRENT_FEED.get(evt.user_id, [])
+    current_idx = USER_FEED_INDEX.get(evt.user_id, 0)
+    if 0 <= current_idx < len(stored_feed):
+        current_id = stored_feed[current_idx].get("item_id")
+        if current_id == evt.item_id and current_idx + 1 < len(stored_feed):
+            next_id = stored_feed[current_idx + 1].get("item_id")
+            set_item_status(evt.user_id, next_id, ItemStatus.ACTIVE)
+
+    write_user_feed_csv(evt.user_id)
     return {"ok": True}
 
 
@@ -649,10 +670,14 @@ def reset(req: ResetRequest):
     USER_CURRENT_FEED.pop(req.user_id, None)
     USER_FEED_INDEX.pop(req.user_id, None)
     USER_ITEM_STATUS.pop(req.user_id, None)
+    USER_FEED_RECORDS.pop(req.user_id, None)
 
     if LAST_ACTIVE_USER == req.user_id:
         LAST_ACTIVE_USER = None
         LAST_ACTIVITY_AT = 0.0
+
+    if os.path.exists(CSV_PATH):
+        os.remove(CSV_PATH)
 
     return {"ok": True}
 
@@ -792,16 +817,19 @@ def admin_preview_feed(user_id: str, limit: int = 15):
 @app.get("/admin/feed.csv")
 def admin_feed_csv():
     if not LAST_ACTIVE_USER:
-        content = "#,status,item_id,title\n"
+        content = "position,status,item_id,title\n"
     else:
-        items = get_current_feed_preview(LAST_ACTIVE_USER, limit=15, include_active=True)
-        lines = ["#,status,item_id,title"]
-        for item in items:
-            status = "ACTIVE" if item.get("is_active") else f"next {(item.get('position', 1) - 1)}"
+        records = USER_FEED_RECORDS.get(LAST_ACTIVE_USER, {})
+        lines = ["position,status,item_id,title"]
+        for rec in records.values():
+            item = rec["item"]
             item_id = str(item.get("item_id", "")).replace('"', '""')
             title = str(item.get("title", "")).replace('"', '""')
-            lines.append(f'{item.get("position", "")},{status},"{item_id}","{title}"')
+            status = rec["status"]
+            position = rec["position"]
+            lines.append(f'{position},{status},"{item_id}","{title}"')
         content = "\n".join(lines)
+
     return Response(
         content=content,
         media_type="text/csv",
