@@ -526,11 +526,6 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 def refresh_pending_rows(uid: str, new_items: list):
     USER_PENDING_ROWS[uid] = []
     for item in new_items:
-        item_id = item["item_id"]
-        if item_id in USER_HISTORY_ROWS.get(uid, {}):
-            continue
-        if USER_ACTIVE_ROW.get(uid, {}).get("item", {}).get("item_id") == item_id:
-            continue
         USER_PENDING_ROWS[uid].append({
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
@@ -541,35 +536,21 @@ def refresh_pending_rows(uid: str, new_items: list):
 
 def rebuild_csv_state(uid: str):
     rows = []
-
-    history_rows = list(USER_HISTORY_ROWS.get(uid, {}).values())
-    history_rows = sorted(history_rows, key=lambda r: r["ts"])
-    rows.extend([r.copy() for r in history_rows])
+    history = USER_HISTORY_ROWS.get(uid, {})
+    for rec in sorted(history.values(), key=lambda r: r["ts"]):
+        rows.append(rec.copy())
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
         rows.append(active.copy())
 
     pending = USER_PENDING_ROWS.get(uid, [])
-    active_id = active["item"]["item_id"] if active else None
-    history_ids = {r["item"]["item_id"] for r in history_rows}
-
-    filtered_pending = []
-    seen_ids = set(history_ids)
-    if active_id:
-        seen_ids.add(active_id)
-
-    for rec in pending:
-        item_id = rec["item"]["item_id"]
-        if item_id in seen_ids:
-            continue
-        filtered_pending.append(rec.copy())
-        seen_ids.add(item_id)
-
-    rows.extend(filtered_pending)
+    rows.extend([r.copy() for r in pending])
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
+        if row["status"] == ItemStatus.ACTIVE.value:
+            pass
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
@@ -612,7 +593,6 @@ def feed(req: FeedRequest):
                 ensure_history_row(req.user_id, item)
             if items:
                 set_active_row(req.user_id, items[0])
-                
         else:
             refresh_pending_rows(req.user_id, items)
 
