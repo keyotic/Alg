@@ -548,9 +548,9 @@ def rebuild_csv_state(uid: str):
     rows.extend([r.copy() for r in pending])
 
     for i, row in enumerate(rows, start=1):
-    row["position"] = i
-    if row["status"] == ItemStatus.ACTIVE.value:
-        pass
+        row["position"] = i
+        if row["status"] == ItemStatus.ACTIVE.value:
+            row["position"] = 1
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
@@ -593,7 +593,7 @@ def feed(req: FeedRequest):
                 ensure_history_row(req.user_id, item)
             if items:
                 set_active_row(req.user_id, items[0])
-                USER_ACTIVE_ROW[req.user_id]["position"] = 1
+                
         else:
             refresh_pending_rows(req.user_id, items)
 
