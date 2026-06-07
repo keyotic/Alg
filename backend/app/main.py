@@ -550,7 +550,7 @@ def rebuild_csv_state(uid: str):
     for i, row in enumerate(rows, start=1):
         row["position"] = i
         if row["status"] == ItemStatus.ACTIVE.value:
-            row["position"] = 1
+            pass
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
