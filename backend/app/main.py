@@ -610,7 +610,7 @@ def feed(req: FeedRequest):
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
-            # First load
+            # First load — set active and pending
             if items:
                 set_active_row(req.user_id, items[0])
                 refresh_pending_rows(req.user_id, items[1:])
@@ -629,40 +629,8 @@ def feed(req: FeedRequest):
             ]
             refresh_pending_rows(req.user_id, new_pending)
 
-        # ── FIXED: CSV always mirrors USER_CURRENT_FEED exactly
-        # Build CSV rows from the actual feed returned to frontend
-        csv_rows = []
-        
-        # Active item (position 1)
-        if USER_ACTIVE_ROW.get(req.user_id):
-            active = USER_ACTIVE_ROW[req.user_id]
-            csv_rows.append({
-                "position": 1,
-                "status": active["status"],
-                "item_id": active["item"]["item_id"],
-                "title": active["item"].get("title", ""),
-            })
-        
-        # Pending items (positions 2–10)
-        for i, pending in enumerate(USER_PENDING_ROWS.get(req.user_id, []), start=2):
-            if i > 10:  # Only log first 9 pending items (positions 2–10)
-                break
-            csv_rows.append({
-                "position": i,
-                "status": pending["status"],
-                "item_id": pending["item"]["item_id"],
-                "title": pending["item"].get("title", ""),
-            })
-        
-        # Write CSV
-        lines = ["position,status,item_id,title"]
-        for row in csv_rows:
-            item_id = str(row["item_id"]).replace('"', '""')
-            title = str(row["title"]).replace('"', '""')
-            lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
-        
-        with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
-            f.write("\n".join(lines))
+        # ── REMOVED: NO CSV WRITE HERE
+        # CSV only writes when user interacts, not when feed loads
 
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         return {"items": clean}
@@ -731,7 +699,7 @@ def interactions(evt: Interaction):
         clear_active_row(evt.user_id)
         refresh_pending_rows(evt.user_id, [])
 
-    # ── FIXED: CSV mirrors exactly what frontend sees (active + first 9 pending)
+    # ── KEEP THIS: CSV writes ONLY on interaction
     csv_rows = []
     if USER_ACTIVE_ROW.get(evt.user_id):
         active = USER_ACTIVE_ROW[evt.user_id]
@@ -742,7 +710,7 @@ def interactions(evt: Interaction):
             "title": active["item"].get("title", ""),
         })
     for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=2):
-        if i > 10:  # Only positions 2–10
+        if i > 10:
             break
         csv_rows.append({
             "position": i,
@@ -897,17 +865,12 @@ def admin_preview_feed(user_id: str, limit: int = 15):
 
 @app.get("/admin/feed.csv")
 def admin_feed_csv():
-    if not LAST_ACTIVE_USER:
+    if not os.path.exists(CSV_PATH):
         content = "position,status,item_id,title\n"
     else:
-        rows = rebuild_csv_state(LAST_ACTIVE_USER)
-        lines = ["position,status,item_id,title"]
-        for row in rows:
-            item = row["item"]
-            item_id = str(item.get("item_id", "")).replace('"', '""')
-            title = str(item.get("title", "")).replace('"', '""')
-            lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
-        content = "\n".join(lines)
+        # ── READ ONLY: just return existing file content
+        with open(CSV_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
 
     return Response(
         content=content,
@@ -916,6 +879,6 @@ def admin_feed_csv():
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
             "Access-Control-Allow-Headers": "*",
-            "Refresh": "2",
+            "Refresh": "2",  # This tells frontend to re-read every 2s, but doesn't write
         }
     )
