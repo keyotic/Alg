@@ -555,10 +555,10 @@ def rebuild_csv_state(uid: str):
     if active:
         rows.append(active.copy())
 
+    latest_feed = USER_CURRENT_FEED.get(uid, [])
     history_ids = {r["item"]["item_id"] for r in history_rows}
     active_id = active["item"]["item_id"] if active else None
 
-    latest_feed = USER_CURRENT_FEED.get(uid, [])
     pending_rows = []
     for item in latest_feed:
         item_id = item["item_id"]
@@ -611,7 +611,6 @@ def feed(req: FeedRequest):
             include_debug=True
         )
 
-        USER_CURRENT_FEED[req.user_id] = []
         USER_CURRENT_FEED[req.user_id] = [item.copy() for item in items]
 
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
