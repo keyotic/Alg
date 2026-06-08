@@ -679,7 +679,7 @@ def interactions(evt: Interaction):
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
 
-    # Update status in USER_ITEM_STATUS
+    # Update status
     new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
     USER_ITEM_STATUS.setdefault(evt.user_id, {})
     USER_ITEM_STATUS[evt.user_id][evt.item_id] = new_status
@@ -704,47 +704,48 @@ def interactions(evt: Interaction):
     set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    # ❌ REMOVED: Build fresh feed and update USER_CURRENT_FEED (this breaks CSV/frontend sync)
-    # The new feed will be loaded when frontend calls /feed again
+    # Build new feed for positions 7-10 only
+    fresh = build_feed_items(
+        uid=evt.user_id,
+        limit=4,  # Only need 4 new items for positions 7-10
+        exclude_seen=True,
+        include_debug=True
+    )
+    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+    next_pending = [i for i in fresh if i["item_id"] not in interacted]
 
-    # ── FIXED: CSV reads from OLD USER_CURRENT_FEED (what frontend is still showing)
-    # Only the status of the interacted item changes
+    # Update pending rows (positions 7-10)
+    if next_pending:
+        USER_PENDING_ROWS[evt.user_id] = next_pending[:4]
+    else:
+        USER_PENDING_ROWS[evt.user_id] = []
+
+    # ── FIXED: CSV locks positions 1-6 from USER_CURRENT_FEED, only 7-10 update from USER_PENDING_ROWS
     lines = ["position,status,item_id,title"]
     current_feed = USER_CURRENT_FEED.get(evt.user_id, [])
     
     if current_feed:
-        # Position 1: active item
-        active_item = current_feed[0]
-        item_id = str(active_item["item_id"]).replace('"', '""')
-        title = str(active_item.get("title", "")).replace('"', '""')
-        status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "active")
-        lines.append(f'1,{status},"{item_id}","{title}"')
-        
-        # Positions 2-10: pending items (unchanged until /feed is called)
-        for i, item in enumerate(current_feed[1:10], start=2):
+        # Positions 1-6: LOCKED (from current_feed, what frontend shows)
+        for i in range(min(6, len(current_feed))):
+            item = current_feed[i]
             item_id = str(item["item_id"]).replace('"', '""')
             title = str(item.get("title", "")).replace('"', '""')
+            status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "active" if i == 0 else "pending")
+            lines.append(f'{i+1},{status},"{item_id}","{title}"')
+        
+        # Positions 7-10: UPDATED (from USER_PENDING_ROWS, new algorithm feed)
+        for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=7):
+            if i > 10:
+                break
+            item_id = str(pending["item"]["item_id"]).replace('"', '""')
+            title = str(pending["item"].get("title", "")).replace('"', '""')
             status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "pending")
             lines.append(f'{i},{status},"{item_id}","{title}"')
     
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines))
 
-    # Return the NEW feed for frontend to optionally use (but frontend doesn't have to refresh)
-    fresh = build_feed_items(
-        uid=evt.user_id,
-        limit=10,
-        exclude_seen=True,
-        include_debug=True
-    )
-    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
-    next_items = [i for i in fresh if i["item_id"] not in interacted]
-    
-    if next_items:
-        set_active_row(evt.user_id, next_items[0])
-        refresh_pending_rows(evt.user_id, next_items[1:])
-    
-    return {"ok": True, "next_feed": next_items[:10] if next_items else []}
+    return {"ok": True}
 
 @app.get("/admin/users")
 def admin_users():
