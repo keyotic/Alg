@@ -536,21 +536,20 @@ def refresh_pending_rows(uid: str, new_items: list):
 
 def rebuild_csv_state(uid: str):
     rows = []
-    history = USER_HISTORY_ROWS.get(uid, {})
-    for rec in sorted(history.values(), key=lambda r: r["ts"]):
-        rows.append(rec.copy())
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
         rows.append(active.copy())
+
+    history = USER_HISTORY_ROWS.get(uid, {})
+    for rec in sorted(history.values(), key=lambda r: r["ts"]):
+        rows.append(rec.copy())
 
     pending = USER_PENDING_ROWS.get(uid, [])
     rows.extend([r.copy() for r in pending])
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
-        if row["status"] == ItemStatus.ACTIVE.value:
-            pass
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
