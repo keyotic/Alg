@@ -707,7 +707,7 @@ def interactions(evt: Interaction):
     # Build new feed for positions 7-10 only
     fresh = build_feed_items(
         uid=evt.user_id,
-        limit=4,  # Only need 4 new items for positions 7-10
+        limit=4,
         exclude_seen=True,
         include_debug=True
     )
@@ -715,32 +715,36 @@ def interactions(evt: Interaction):
     next_pending = [i for i in fresh if i["item_id"] not in interacted]
 
     # Update pending rows (positions 7-10)
-    if next_pending:
-        USER_PENDING_ROWS[evt.user_id] = next_pending[:4]
-    else:
-        USER_PENDING_ROWS[evt.user_id] = []
+    USER_PENDING_ROWS[evt.user_id] = next_pending[:4] if next_pending else []
 
-    # ── FIXED: CSV locks positions 1-6 from USER_CURRENT_FEED, only 7-10 update from USER_PENDING_ROWS
+    # ── FIXED: Build CSV from USER_ACTIVE_ROW + USER_PENDING_ROWS (not USER_CURRENT_FEED)
     lines = ["position,status,item_id,title"]
-    current_feed = USER_CURRENT_FEED.get(evt.user_id, [])
     
-    if current_feed:
-        # Positions 1-6: LOCKED (from current_feed, what frontend shows)
-        for i in range(min(6, len(current_feed))):
-            item = current_feed[i]
-            item_id = str(item["item_id"]).replace('"', '""')
-            title = str(item.get("title", "")).replace('"', '""')
-            status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "active" if i == 0 else "pending")
-            lines.append(f'{i+1},{status},"{item_id}","{title}"')
-        
-        # Positions 7-10: UPDATED (from USER_PENDING_ROWS, new algorithm feed)
-        for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=7):
-            if i > 10:
-                break
-            item_id = str(pending["item"]["item_id"]).replace('"', '""')
-            title = str(pending["item"].get("title", "")).replace('"', '""')
-            status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "pending")
-            lines.append(f'{i},{status},"{item_id}","{title}"')
+    # Position 1: active item
+    if USER_ACTIVE_ROW.get(evt.user_id):
+        active = USER_ACTIVE_ROW[evt.user_id]
+        item_id = str(active["item"]["item_id"]).replace('"', '""')
+        title = str(active["item"].get("title", "")).replace('"', '""')
+        status = active["status"]
+        lines.append(f'1,{status},"{item_id}","{title}"')
+    
+    # Positions 2-6: locked pending from USER_CURRENT_FEED
+    current_feed = USER_CURRENT_FEED.get(evt.user_id, [])
+    for i in range(1, min(6, len(current_feed))):
+        item = current_feed[i]
+        item_id = str(item["item_id"]).replace('"', '""')
+        title = str(item.get("title", "")).replace('"', '""')
+        status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "pending")
+        lines.append(f'{i+1},{status},"{item_id}","{title}"')
+    
+    # Positions 7-10: updated from USER_PENDING_ROWS
+    for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=7):
+        if i > 10:
+            break
+        item_id = str(pending["item"]["item_id"]).replace('"', '""')
+        title = str(pending["item"].get("title", "")).replace('"', '""')
+        status = pending["status"]
+        lines.append(f'{i},{status},"{item_id}","{title}"')
     
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines))
