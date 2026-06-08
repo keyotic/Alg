@@ -604,6 +604,7 @@ def write_user_feed_csv(uid: str):
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
+
         items = build_feed_items(
             uid=req.user_id,
             limit=req.limit,
@@ -614,7 +615,7 @@ def feed(req: FeedRequest):
         USER_CURRENT_FEED[req.user_id] = [item.copy() for item in items]
 
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
-        USER_PENDING_ROWS.setdefault(req.user_id, [])
+        USER_PENDING_ROWS[req.user_id] = []
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id]:
