@@ -545,38 +545,21 @@ def refresh_pending_rows(uid: str, new_items: list):
 def rebuild_csv_state(uid: str):
     rows = []
 
-    history_rows = list(USER_HISTORY_ROWS.get(uid, {}).values())
-    history_rows = sorted(history_rows, key=lambda r: r["ts"])
+    history_rows = sorted(
+        USER_HISTORY_ROWS.get(uid, {}).values(),
+        key=lambda r: r["ts"]
+    )
     rows.extend([r.copy() for r in history_rows])
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
         rows.append(active.copy())
 
-    history_ids = {r["item"]["item_id"] for r in history_rows}
-    active_id = active["item"]["item_id"] if active else None
-
-    current_feed = USER_CURRENT_FEED.get(uid, [])
-    pending_rows = []
-    for item in current_feed:
-        item_id = item["item_id"]
-        if item_id in history_ids:
-            continue
-        if active_id and item_id == active_id:
-            continue
-        pending_rows.append({
-            "item": item.copy(),
-            "status": ItemStatus.PENDING.value,
-            "position": 0,
-            "ts": time.time(),
-        })
-
+    pending_rows = [r.copy() for r in USER_PENDING_ROWS.get(uid, [])]
     rows.extend(pending_rows)
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
-
-    USER_PENDING_ROWS[uid] = pending_rows
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
