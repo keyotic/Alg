@@ -524,6 +524,10 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 
 
 def refresh_pending_rows(uid: str, new_items: list):
+    current_pending = USER_PENDING_ROWS.get(uid, [])
+    current_pending_ids = {r["item"]["item_id"] for r in current_pending}
+    new_ids = [item["item_id"] for item in new_items]
+
     USER_PENDING_ROWS[uid] = [
         {
             "item": item.copy(),
@@ -535,6 +539,8 @@ def refresh_pending_rows(uid: str, new_items: list):
         if item["item_id"] not in USER_HISTORY_ROWS.get(uid, {})
         and item["item_id"] != USER_ACTIVE_ROW.get(uid, {}).get("item", {}).get("item_id")
     ]
+
+    USER_FEED_INDEX[uid] = 0
 
 
 def rebuild_csv_state(uid: str):
