@@ -555,11 +555,30 @@ def rebuild_csv_state(uid: str):
     if active:
         rows.append(active.copy())
 
-    pending_rows = [r.copy() for r in USER_PENDING_ROWS.get(uid, [])]
+    history_ids = {r["item"]["item_id"] for r in history_rows}
+    active_id = active["item"]["item_id"] if active else None
+
+    latest_feed = USER_CURRENT_FEED.get(uid, [])
+    pending_rows = []
+    for item in latest_feed:
+        item_id = item["item_id"]
+        if item_id in history_ids:
+            continue
+        if active_id and item_id == active_id:
+            continue
+        pending_rows.append({
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": 0,
+            "ts": time.time(),
+        })
+
     rows.extend(pending_rows)
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
+
+    USER_PENDING_ROWS[uid] = pending_rows
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
