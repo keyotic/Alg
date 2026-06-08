@@ -679,18 +679,19 @@ def interactions(evt: Interaction):
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
 
+    # Update status in USER_ITEM_STATUS
+    new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+    USER_ITEM_STATUS.setdefault(evt.user_id, {})
+    USER_ITEM_STATUS[evt.user_id][evt.item_id] = new_status
+
     if evt.user_id in USER_ACTIVE_ROW and USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"] == evt.item_id:
-        new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
         USER_ACTIVE_ROW[evt.user_id]["status"] = new_status
         USER_HISTORY_ROWS.setdefault(evt.user_id, {})
         USER_HISTORY_ROWS[evt.user_id][evt.item_id] = USER_ACTIVE_ROW[evt.user_id].copy()
-        USER_ITEM_STATUS.setdefault(evt.user_id, {})
-        USER_ITEM_STATUS[evt.user_id][evt.item_id] = new_status
         clear_active_row(evt.user_id)
     else:
         USER_HISTORY_ROWS.setdefault(evt.user_id, {})
         if evt.item_id not in USER_HISTORY_ROWS[evt.user_id]:
-            new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
             USER_HISTORY_ROWS[evt.user_id][evt.item_id] = {
                 "item": convert_path_to_url(ITEMS_META[evt.item_id]),
                 "status": new_status,
@@ -698,35 +699,16 @@ def interactions(evt: Interaction):
                 "ts": time.time(),
             }
         else:
-            new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
             USER_HISTORY_ROWS[evt.user_id][evt.item_id]["status"] = new_status
 
-        set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
-
+    set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    # Build fresh feed
-    fresh = build_feed_items(
-        uid=evt.user_id,
-        limit=10,
-        exclude_seen=True,
-        include_debug=True
-    )
+    # ❌ REMOVED: Build fresh feed and update USER_CURRENT_FEED (this breaks CSV/frontend sync)
+    # The new feed will be loaded when frontend calls /feed again
 
-    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
-    next_items = [i for i in fresh if i["item_id"] not in interacted]
-
-    if next_items:
-        set_active_row(evt.user_id, next_items[0])
-        refresh_pending_rows(evt.user_id, next_items[1:])
-    else:
-        clear_active_row(evt.user_id)
-        refresh_pending_rows(evt.user_id, [])
-
-    # ── FIXED: Update USER_CURRENT_FEED so CSV reads from the new feed
-    USER_CURRENT_FEED[evt.user_id] = next_items[:10] if next_items else []
-
-    # CSV built from USER_CURRENT_FEED (now updated with new feed)
+    # ── FIXED: CSV reads from OLD USER_CURRENT_FEED (what frontend is still showing)
+    # Only the status of the interacted item changes
     lines = ["position,status,item_id,title"]
     current_feed = USER_CURRENT_FEED.get(evt.user_id, [])
     
@@ -738,7 +720,7 @@ def interactions(evt: Interaction):
         status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "active")
         lines.append(f'1,{status},"{item_id}","{title}"')
         
-        # Positions 2-10: pending items
+        # Positions 2-10: pending items (unchanged until /feed is called)
         for i, item in enumerate(current_feed[1:10], start=2):
             item_id = str(item["item_id"]).replace('"', '""')
             title = str(item.get("title", "")).replace('"', '""')
@@ -748,7 +730,21 @@ def interactions(evt: Interaction):
     with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
         f.write("\n".join(lines))
 
-    return {"ok": True}
+    # Return the NEW feed for frontend to optionally use (but frontend doesn't have to refresh)
+    fresh = build_feed_items(
+        uid=evt.user_id,
+        limit=10,
+        exclude_seen=True,
+        include_debug=True
+    )
+    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+    next_items = [i for i in fresh if i["item_id"] not in interacted]
+    
+    if next_items:
+        set_active_row(evt.user_id, next_items[0])
+        refresh_pending_rows(evt.user_id, next_items[1:])
+    
+    return {"ok": True, "next_feed": next_items[:10] if next_items else []}
 
 @app.get("/admin/users")
 def admin_users():
