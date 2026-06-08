@@ -611,7 +611,9 @@ def feed(req: FeedRequest):
             include_debug=True
         )
 
-        USER_CURRENT_FEED[req.user_id] = items
+        USER_CURRENT_FEED[req.user_id] = []
+        USER_CURRENT_FEED[req.user_id] = [item.copy() for item in items]
+
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
         USER_PENDING_ROWS.setdefault(req.user_id, [])
         USER_ITEM_STATUS.setdefault(req.user_id, {})
