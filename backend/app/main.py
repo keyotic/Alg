@@ -610,14 +610,12 @@ def feed(req: FeedRequest):
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
-            # First load
             if items:
                 set_active_row(req.user_id, items[0])
                 refresh_pending_rows(req.user_id, items[1:])
             else:
                 refresh_pending_rows(req.user_id, [])
         else:
-            # New feed after interaction — replace pending
             interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
             active_id = (
                 USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
@@ -629,37 +627,24 @@ def feed(req: FeedRequest):
             ]
             refresh_pending_rows(req.user_id, new_pending)
 
-        # ── FIXED: CSV always mirrors USER_CURRENT_FEED exactly
-        # Build CSV rows from the actual feed returned to frontend
-        csv_rows = []
-        
-        # Active item (position 1)
-        if USER_ACTIVE_ROW.get(req.user_id):
-            active = USER_ACTIVE_ROW[req.user_id]
-            csv_rows.append({
-                "position": 1,
-                "status": active["status"],
-                "item_id": active["item"]["item_id"],
-                "title": active["item"].get("title", ""),
-            })
-        
-        # Pending items (positions 2–10)
-        for i, pending in enumerate(USER_PENDING_ROWS.get(req.user_id, []), start=2):
-            if i > 10:  # Only log first 9 pending items (positions 2–10)
-                break
-            csv_rows.append({
-                "position": i,
-                "status": pending["status"],
-                "item_id": pending["item"]["item_id"],
-                "title": pending["item"].get("title", ""),
-            })
-        
-        # Write CSV
+        # ── FIXED: CSV built directly from USER_CURRENT_FEED (exact frontend feed)
         lines = ["position,status,item_id,title"]
-        for row in csv_rows:
-            item_id = str(row["item_id"]).replace('"', '""')
-            title = str(row["title"]).replace('"', '""')
-            lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
+        
+        # Position 1: first item (active)
+        if items:
+            active_item = items[0]
+            item_id = str(active_item["item_id"]).replace('"', '""')
+            title = str(active_item.get("title", "")).replace('"', '""')
+            # Status is ACTIVE unless it's already in history as liked/skipped
+            status = USER_ITEM_STATUS.get(req.user_id, {}).get(item_id, "active")
+            lines.append(f'1,{status},"{item_id}","{title}"')
+        
+        # Positions 2-10: items 2-10 from feed (pending)
+        for i, item in enumerate(items[1:10], start=2):
+            item_id = str(item["item_id"]).replace('"', '""')
+            title = str(item.get("title", "")).replace('"', '""')
+            status = USER_ITEM_STATUS.get(req.user_id, {}).get(item_id, "pending")
+            lines.append(f'{i},{status},"{item_id}","{title}"')
         
         with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
             f.write("\n".join(lines))
