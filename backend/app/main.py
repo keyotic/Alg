@@ -670,7 +670,6 @@ def feed(req: FeedRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.post("/advance")
 def advance(req: Advance):
     mark_active(req.user_id)
