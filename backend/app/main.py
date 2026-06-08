@@ -524,24 +524,17 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 
 
 def refresh_pending_rows(uid: str, new_items: list):
-    history_ids = set(USER_HISTORY_ROWS.get(uid, {}).keys())
-    active_id = USER_ACTIVE_ROW.get(uid, {}).get("item", {}).get("item_id")
-    keep = []
-
-    for item in new_items:
-        item_id = item["item_id"]
-        if item_id in history_ids:
-            continue
-        if active_id and item_id == active_id:
-            continue
-        keep.append({
+    USER_PENDING_ROWS[uid] = [
+        {
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
             "position": 0,
             "ts": time.time(),
-        })
-
-    USER_PENDING_ROWS[uid] = keep
+        }
+        for item in new_items
+        if item["item_id"] not in USER_HISTORY_ROWS.get(uid, {})
+        and item["item_id"] != USER_ACTIVE_ROW.get(uid, {}).get("item", {}).get("item_id")
+    ]
 
 
 def rebuild_csv_state(uid: str):
