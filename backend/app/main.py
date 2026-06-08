@@ -546,31 +546,31 @@ def refresh_pending_rows(uid: str, new_items: list):
 def rebuild_csv_state(uid: str):
     rows = []
 
-    history_rows = list(USER_HISTORY_ROWS.get(uid, {}).values())
-    history_rows = sorted(history_rows, key=lambda r: r["ts"])
+    history = USER_HISTORY_ROWS.get(uid, {})
+    history_rows = sorted(history.values(), key=lambda r: r["ts"])
     rows.extend([r.copy() for r in history_rows])
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
         rows.append(active.copy())
 
-    pending = USER_PENDING_ROWS.get(uid, [])
-    active_id = active["item"]["item_id"] if active else None
-    history_ids = {r["item"]["item_id"] for r in history_rows}
+    current_feed = USER_CURRENT_FEED.get(uid, [])
+    current_ids = set()
+    if active:
+        current_ids.add(active["item"]["item_id"])
+    current_ids.update(r["item"]["item_id"] for r in history_rows)
 
-    filtered_pending = []
-    seen_ids = set(history_ids)
-    if active_id:
-        seen_ids.add(active_id)
-
-    for rec in pending:
-        item_id = rec["item"]["item_id"]
-        if item_id in seen_ids:
+    for item in current_feed:
+        item_id = item["item_id"]
+        if item_id in current_ids:
             continue
-        filtered_pending.append(rec.copy())
-        seen_ids.add(item_id)
-
-    rows.extend(filtered_pending)
+        rows.append({
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": 0,
+            "ts": time.time(),
+        })
+        current_ids.add(item_id)
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
