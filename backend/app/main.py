@@ -524,16 +524,8 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 
 
 def refresh_pending_rows(uid: str, new_items: list):
-    history_ids = set(USER_HISTORY_ROWS.get(uid, {}).keys())
-    active_id = USER_ACTIVE_ROW.get(uid, {}).get("item", {}).get("item_id")
-
     USER_PENDING_ROWS[uid] = []
     for item in new_items:
-        item_id = item["item_id"]
-        if item_id in history_ids:
-            continue
-        if active_id and item_id == active_id:
-            continue
         USER_PENDING_ROWS[uid].append({
             "item": item.copy(),
             "status": ItemStatus.PENDING.value,
@@ -544,41 +536,21 @@ def refresh_pending_rows(uid: str, new_items: list):
 
 def rebuild_csv_state(uid: str):
     rows = []
-
-    history_rows = sorted(
-        USER_HISTORY_ROWS.get(uid, {}).values(),
-        key=lambda r: r["ts"]
-    )
-    rows.extend([r.copy() for r in history_rows])
+    history = USER_HISTORY_ROWS.get(uid, {})
+    for rec in sorted(history.values(), key=lambda r: r["ts"]):
+        rows.append(rec.copy())
 
     active = USER_ACTIVE_ROW.get(uid)
     if active:
         rows.append(active.copy())
 
-    latest_feed = USER_CURRENT_FEED.get(uid, [])
-    history_ids = {r["item"]["item_id"] for r in history_rows}
-    active_id = active["item"]["item_id"] if active else None
-
-    pending_rows = []
-    for item in latest_feed:
-        item_id = item["item_id"]
-        if item_id in history_ids:
-            continue
-        if active_id and item_id == active_id:
-            continue
-        pending_rows.append({
-            "item": item.copy(),
-            "status": ItemStatus.PENDING.value,
-            "position": 0,
-            "ts": time.time(),
-        })
-
-    rows.extend(pending_rows)
+    pending = USER_PENDING_ROWS.get(uid, [])
+    rows.extend([r.copy() for r in pending])
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
-
-    USER_PENDING_ROWS[uid] = pending_rows
+        if row["status"] == ItemStatus.ACTIVE.value:
+            pass
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
@@ -604,7 +576,6 @@ def write_user_feed_csv(uid: str):
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
-
         items = build_feed_items(
             uid=req.user_id,
             limit=req.limit,
@@ -612,10 +583,9 @@ def feed(req: FeedRequest):
             include_debug=True
         )
 
-        USER_CURRENT_FEED[req.user_id] = [item.copy() for item in items]
-
+        USER_CURRENT_FEED[req.user_id] = items
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
-        USER_PENDING_ROWS[req.user_id] = []
+        USER_PENDING_ROWS.setdefault(req.user_id, [])
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id]:
