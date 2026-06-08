@@ -611,14 +611,13 @@ def feed(req: FeedRequest):
         USER_PENDING_ROWS.setdefault(req.user_id, [])
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
-        if not USER_HISTORY_ROWS[req.user_id]:
-            # First feed load — set first item active, rest pending
-            for item in items[1:]:
-                ensure_history_row(req.user_id, item)
+        if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
+            # First ever load — only item[0] goes active, rest go to pending (not history)
             if items:
                 set_active_row(req.user_id, items[0])
+            refresh_pending_rows(req.user_id, items[1:])
         else:
-            # ── FIXED: guard against already-interacted or active items
+            # Subsequent calls — replace pending, guard interacted and active items
             interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
             active_id = (
                 USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
