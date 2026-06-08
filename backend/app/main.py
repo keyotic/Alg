@@ -63,8 +63,6 @@ USER_HISTORY_ROWS = {}
 USER_ACTIVE_ROW = {}
 USER_PENDING_ROWS = {}
 
-# At the top with other USER_* dicts
-USER_FEED_BATCH_PENDING_START = {}  # Tracks where current feed's pending items start
 
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
@@ -542,9 +540,9 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 #    guarding against items already interacted with or currently active
 def refresh_pending_rows(uid: str, new_items: list):
     """
-    Replace ALL pending items with new feed's pending items.
-    Old pending items from previous feeds are deleted.
-    Interacted items (liked/skipped) in USER_HISTORY_ROWS stay untouched.
+    Replace ONLY the pending slots (positions 2–10).
+    The active item (position 1, currently in USER_ACTIVE_ROW) is NEVER replaced.
+    Interacted items (in USER_HISTORY_ROWS) are also protected.
     """
     interacted = set(USER_HISTORY_ROWS.get(uid, {}).keys())
     active_id = (
@@ -552,19 +550,20 @@ def refresh_pending_rows(uid: str, new_items: list):
         if uid in USER_ACTIVE_ROW else None
     )
 
-    # Filter new items: exclude interacted and active
+    # new_items comes from build_feed_items as the full feed [active, pending1, pending2, ...]
+    # We want to keep active_id as the first item, and only replace the rest
     new_pending = []
     for item in new_items:
         iid = item["item_id"]
+        # Skip interacted items AND skip the currently active item
         if iid not in interacted and iid != active_id:
             new_pending.append({
                 "item": item.copy(),
                 "status": ItemStatus.PENDING.value,
+                "position": 0,
                 "ts": time.time(),
             })
 
-    # Replace ALL pending items (old pending from previous feeds are deleted)
-    USER_PENDING_ROWS[uid] = new_pending
     USER_PENDING_ROWS[uid] = new_pending
 
 
@@ -609,7 +608,6 @@ def feed(req: FeedRequest):
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
         USER_PENDING_ROWS.setdefault(req.user_id, [])
         USER_ITEM_STATUS.setdefault(req.user_id, {})
-        USER_FEED_BATCH_PENDING_START.setdefault(req.user_id, 7)
 
         if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
             # First load
@@ -618,10 +616,24 @@ def feed(req: FeedRequest):
                 refresh_pending_rows(req.user_id, items[1:])
             else:
                 refresh_pending_rows(req.user_id, [])
+        else:
+            # New feed after interaction — replace pending
+            interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
+            active_id = (
+                USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
+                if req.user_id in USER_ACTIVE_ROW else None
+            )
+            new_pending = [
+                i for i in items
+                if i["item_id"] not in interacted and i["item_id"] != active_id
+            ]
+            refresh_pending_rows(req.user_id, new_pending)
 
-        # ── CSV: Same logic as /interactions
+        # ── FIXED: CSV always mirrors USER_CURRENT_FEED exactly
+        # Build CSV rows from the actual feed returned to frontend
         csv_rows = []
         
+        # Active item (position 1)
         if USER_ACTIVE_ROW.get(req.user_id):
             active = USER_ACTIVE_ROW[req.user_id]
             csv_rows.append({
@@ -631,30 +643,24 @@ def feed(req: FeedRequest):
                 "title": active["item"].get("title", ""),
             })
         
-        history = USER_HISTORY_ROWS.get(req.user_id, {})
-        for i, rec in sorted(history.values(), key=lambda r: r["ts"]):
-            csv_rows.append({
-                "position": i + 1,
-                "status": rec["status"],
-                "item_id": rec["item"]["item_id"],
-                "title": rec["item"].get("title", ""),
-            })
-        
-        interacted_count = len(USER_HISTORY_ROWS.get(req.user_id, {}))
-        for i, pending in enumerate(USER_PENDING_ROWS.get(req.user_id, []), start=interacted_count + 2):
+        # Pending items (positions 2–10)
+        for i, pending in enumerate(USER_PENDING_ROWS.get(req.user_id, []), start=2):
+            if i > 10:  # Only log first 9 pending items (positions 2–10)
+                break
             csv_rows.append({
                 "position": i,
                 "status": pending["status"],
                 "item_id": pending["item"]["item_id"],
                 "title": pending["item"].get("title", ""),
             })
-
+        
+        # Write CSV
         lines = ["position,status,item_id,title"]
         for row in csv_rows:
             item_id = str(row["item_id"]).replace('"', '""')
             title = str(row["title"]).replace('"', '""')
             lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
-
+        
         with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
             f.write("\n".join(lines))
 
@@ -709,41 +715,25 @@ def interactions(evt: Interaction):
     set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    # ── Check if feed should refresh (after 6 interactions)
-    interacted_count = len(USER_HISTORY_ROWS.get(evt.user_id, {}))
-    should_refresh = interacted_count % 6 == 0 and interacted_count > 0
-    
-    if should_refresh:
-        # Generate new feed of 10 items — DELETES old pending items from previous feed
-        fresh = build_feed_items(
-            uid=evt.user_id,
-            limit=10,
-            exclude_seen=True,
-            include_debug=True
-        )
-        
-        interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
-        next_items = [i for i in fresh if i["item_id"] not in interacted]
-        
-        if next_items:
-            set_active_row(evt.user_id, next_items[0])
-            refresh_pending_rows(evt.user_id, next_items[1:])  # Replaces ALL pending
-        else:
-            clear_active_row(evt.user_id)
-            refresh_pending_rows(evt.user_id, [])
-    else:
-        # Don't refresh feed — just move to next pending item
-        current_pending = USER_PENDING_ROWS.get(evt.user_id, [])
-        if current_pending:
-            set_active_row(evt.user_id, current_pending[0])
-            USER_PENDING_ROWS[evt.user_id] = current_pending[1:]  # Remove consumed pending
-        else:
-            clear_active_row(evt.user_id)
+    fresh = build_feed_items(
+        uid=evt.user_id,
+        limit=10,
+        exclude_seen=True,
+        include_debug=True
+    )
 
-    # ── CSV: Position 1 = active, Positions 2–N = interacted (liked/skipped), Positions (N+1)+ = current pending
+    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+    next_items = [i for i in fresh if i["item_id"] not in interacted]
+
+    if next_items:
+        set_active_row(evt.user_id, next_items[0])
+        refresh_pending_rows(evt.user_id, next_items[1:])
+    else:
+        clear_active_row(evt.user_id)
+        refresh_pending_rows(evt.user_id, [])
+
+    # ── FIXED: CSV mirrors exactly what frontend sees (active + first 9 pending)
     csv_rows = []
-    
-    # Position 1: Active item
     if USER_ACTIVE_ROW.get(evt.user_id):
         active = USER_ACTIVE_ROW[evt.user_id]
         csv_rows.append({
@@ -752,20 +742,9 @@ def interactions(evt: Interaction):
             "item_id": active["item"]["item_id"],
             "title": active["item"].get("title", ""),
         })
-    
-    # Positions 2–N: Interacted items (liked/skipped) — stay forever
-    history = USER_HISTORY_ROWS.get(evt.user_id, {})
-    for i, rec in sorted(history.values(), key=lambda r: r["ts"]):
-        csv_rows.append({
-            "position": i + 1,  # +1 because position 1 is active
-            "status": rec["status"],
-            "item_id": rec["item"]["item_id"],
-            "title": rec["item"].get("title", ""),
-        })
-    
-    # Positions (N+1)+: Current feed's pending items — replaced on feed refresh
-    interacted_count = len(USER_HISTORY_ROWS.get(evt.user_id, {}))
-    for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=interacted_count + 2):
+    for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=2):
+        if i > 10:  # Only positions 2–10
+            break
         csv_rows.append({
             "position": i,
             "status": pending["status"],
