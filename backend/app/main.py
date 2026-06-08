@@ -539,15 +539,23 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
 # ── FIXED: replaces old pending rows with new feed items,
 #    guarding against items already interacted with or currently active
 def refresh_pending_rows(uid: str, new_items: list):
+    """
+    Replace ONLY the pending slots (positions 2–10).
+    The active item (position 1, currently in USER_ACTIVE_ROW) is NEVER replaced.
+    Interacted items (in USER_HISTORY_ROWS) are also protected.
+    """
     interacted = set(USER_HISTORY_ROWS.get(uid, {}).keys())
     active_id = (
         USER_ACTIVE_ROW[uid]["item"]["item_id"]
         if uid in USER_ACTIVE_ROW else None
     )
 
+    # new_items comes from build_feed_items as the full feed [active, pending1, pending2, ...]
+    # We want to keep active_id as the first item, and only replace the rest
     new_pending = []
     for item in new_items:
         iid = item["item_id"]
+        # Skip interacted items AND skip the currently active item
         if iid not in interacted and iid != active_id:
             new_pending.append({
                 "item": item.copy(),
@@ -612,17 +620,22 @@ def feed(req: FeedRequest):
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
-            # First ever load — only item[0] goes active, rest go to pending (not history)
+            # First ever load for this user
             if items:
                 set_active_row(req.user_id, items[0])
-            refresh_pending_rows(req.user_id, items[1:])
+                # Only pass items[1:] (pending slots) to refresh_pending_rows
+                refresh_pending_rows(req.user_id, items[1:])
+            else:
+                refresh_pending_rows(req.user_id, [])
         else:
-            # Subsequent calls — replace pending, guard interacted and active items
+            # Subsequent feed calls — keep active item, replace only pending
             interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
             active_id = (
                 USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
                 if req.user_id in USER_ACTIVE_ROW else None
             )
+
+            # Filter out interacted items AND the currently active item from the new feed
             new_pending = [
                 i for i in items
                 if i["item_id"] not in interacted and i["item_id"] != active_id
@@ -681,7 +694,6 @@ def interactions(evt: Interaction):
     set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    # ── FIXED: fetch enough items, filter interacted, promote next active cleanly
     fresh = build_feed_items(
         uid=evt.user_id,
         limit=10,
