@@ -12,19 +12,23 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+
 
 ROOT_ARTIFACTS = os.path.join(PROJECT_ROOT, "artifacts")
 ROOT_DATA = os.path.join(PROJECT_ROOT, "data")
 ROOT_OUTPUT = os.path.join(PROJECT_ROOT, "output")
 os.makedirs(ROOT_OUTPUT, exist_ok=True)
 
+
 INDEX_PATH = os.getenv("INDEX_PATH", os.path.join(ROOT_ARTIFACTS, "faiss.index"))
 IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
 CSV_PATH = os.getenv("CSV_PATH", os.path.join(ROOT_OUTPUT, "current_feed.csv"))
+
 
 index = faiss.read_index(INDEX_PATH)
 with open(IDS_PATH, "r") as f:
@@ -33,17 +37,21 @@ ITEM_VECS = np.load(VECTORS_PATH)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
+
 orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
 if orphans:
     print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
 
+
 EMBED_DIM = ITEM_VECS.shape[1]
+
 
 class ItemStatus(str, Enum):
     ACTIVE = "active"
     PENDING = "pending"
     LIKED = "liked"
     SKIPPED = "skipped"
+
 
 USER_VEC = {}
 USER_SEEN = {}
@@ -55,8 +63,10 @@ USER_HISTORY_ROWS = {}
 USER_ACTIVE_ROW = {}
 USER_PENDING_ROWS = {}
 
+
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
+
 
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
@@ -85,6 +95,7 @@ class ResetRequest(BaseModel):
 
 app = FastAPI()
 
+
 @app.middleware("http")
 async def catch_exceptions(request: Request, call_next):
     try:
@@ -97,6 +108,7 @@ async def catch_exceptions(request: Request, call_next):
             headers={"Access-Control-Allow-Origin": "*"},
         )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -104,6 +116,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 app.mount("/images", StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")), name="images")
 
@@ -523,15 +536,27 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
     return [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked if iid in ITEMS_META]
 
 
+# ── FIXED: replaces old pending rows with new feed items,
+#    guarding against items already interacted with or currently active
 def refresh_pending_rows(uid: str, new_items: list):
-    USER_PENDING_ROWS[uid] = []
+    interacted = set(USER_HISTORY_ROWS.get(uid, {}).keys())
+    active_id = (
+        USER_ACTIVE_ROW[uid]["item"]["item_id"]
+        if uid in USER_ACTIVE_ROW else None
+    )
+
+    new_pending = []
     for item in new_items:
-        USER_PENDING_ROWS[uid].append({
-            "item": item.copy(),
-            "status": ItemStatus.PENDING.value,
-            "position": 0,
-            "ts": time.time(),
-        })
+        iid = item["item_id"]
+        if iid not in interacted and iid != active_id:
+            new_pending.append({
+                "item": item.copy(),
+                "status": ItemStatus.PENDING.value,
+                "position": 0,
+                "ts": time.time(),
+            })
+
+    USER_PENDING_ROWS[uid] = new_pending
 
 
 def rebuild_csv_state(uid: str):
@@ -549,8 +574,6 @@ def rebuild_csv_state(uid: str):
 
     for i, row in enumerate(rows, start=1):
         row["position"] = i
-        if row["status"] == ItemStatus.ACTIVE.value:
-            pass
 
     USER_ITEM_STATUS.setdefault(uid, {})
     USER_ITEM_STATUS[uid] = {}
@@ -589,12 +612,23 @@ def feed(req: FeedRequest):
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id]:
+            # First feed load — set first item active, rest pending
             for item in items[1:]:
                 ensure_history_row(req.user_id, item)
             if items:
                 set_active_row(req.user_id, items[0])
         else:
-            refresh_pending_rows(req.user_id, items)
+            # ── FIXED: guard against already-interacted or active items
+            interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
+            active_id = (
+                USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
+                if req.user_id in USER_ACTIVE_ROW else None
+            )
+            new_pending = [
+                i for i in items
+                if i["item_id"] not in interacted and i["item_id"] != active_id
+            ]
+            refresh_pending_rows(req.user_id, new_pending)
 
         write_user_feed_csv(req.user_id)
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
@@ -648,17 +682,23 @@ def interactions(evt: Interaction):
     set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
+    # ── FIXED: fetch enough items, filter interacted, promote next active cleanly
     fresh = build_feed_items(
         uid=evt.user_id,
-        limit=5,
+        limit=10,
         exclude_seen=True,
         include_debug=True
     )
-    refresh_pending_rows(evt.user_id, fresh)
 
-    if fresh:
-        set_active_row(evt.user_id, fresh[0])
-        USER_PENDING_ROWS[evt.user_id] = USER_PENDING_ROWS[evt.user_id][1:]
+    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+    next_items = [i for i in fresh if i["item_id"] not in interacted]
+
+    if next_items:
+        set_active_row(evt.user_id, next_items[0])
+        refresh_pending_rows(evt.user_id, next_items[1:])
+    else:
+        clear_active_row(evt.user_id)
+        refresh_pending_rows(evt.user_id, [])
 
     write_user_feed_csv(evt.user_id)
     return {"ok": True}
