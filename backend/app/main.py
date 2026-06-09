@@ -62,7 +62,7 @@ USER_ITEM_STATUS = {}
 USER_HISTORY_ROWS = {}
 USER_ACTIVE_ROW = {}
 USER_PENDING_ROWS = {}
-
+USER_LOCKED_FEED = {}
 
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
@@ -597,58 +597,34 @@ def rebuild_csv_state(uid: str):
 def feed(req: FeedRequest):
     try:
         mark_active(req.user_id)
+
         items = build_feed_items(
             uid=req.user_id,
-            limit=req.limit,
+            limit=10,
             exclude_seen=req.exclude_seen,
             include_debug=True
         )
 
         USER_CURRENT_FEED[req.user_id] = items
+        USER_LOCKED_FEED[req.user_id] = items[:6]
+
         USER_HISTORY_ROWS.setdefault(req.user_id, {})
         USER_PENDING_ROWS.setdefault(req.user_id, [])
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
-        if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
-            if items:
-                set_active_row(req.user_id, items[0])
-                refresh_pending_rows(req.user_id, items[1:])
-            else:
-                refresh_pending_rows(req.user_id, [])
-        else:
-            interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
-            active_id = (
-                USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
-                if req.user_id in USER_ACTIVE_ROW else None
-            )
-            new_pending = [
-                i for i in items
-                if i["item_id"] not in interacted and i["item_id"] != active_id
-            ]
-            refresh_pending_rows(req.user_id, new_pending)
-
-        # ── FIXED: CSV built directly from USER_CURRENT_FEED (exact frontend feed)
-        lines = ["position,status,item_id,title"]
-        
-        # Position 1: first item (active)
         if items:
-            active_item = items[0]
-            item_id = str(active_item["item_id"]).replace('"', '""')
-            title = str(active_item.get("title", "")).replace('"', '""')
-            # Status is ACTIVE unless it's already in history as liked/skipped
-            status = USER_ITEM_STATUS.get(req.user_id, {}).get(item_id, "active")
-            lines.append(f'1,{status},"{item_id}","{title}"')
-        
-        # Positions 2-10: items 2-10 from feed (pending)
-        for i, item in enumerate(items[1:10], start=2):
-            item_id = str(item["item_id"]).replace('"', '""')
-            title = str(item.get("title", "")).replace('"', '""')
-            status = USER_ITEM_STATUS.get(req.user_id, {}).get(item_id, "pending")
-            lines.append(f'{i},{status},"{item_id}","{title}"')
-        
-        with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
-            f.write("\n".join(lines))
+            set_active_row(req.user_id, items[0])
 
+        USER_PENDING_ROWS[req.user_id] = []
+        for item in items[6:10]:
+            USER_PENDING_ROWS[req.user_id].append({
+                "item": item.copy(),
+                "status": ItemStatus.PENDING.value,
+                "position": 0,
+                "ts": time.time(),
+            })
+
+        write_synced_csv(req.user_id)
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         return {"items": clean}
     except Exception as e:
@@ -668,6 +644,7 @@ def interactions(evt: Interaction):
 
     if evt.action not in ("like", "skip"):
         raise HTTPException(status_code=400, detail="Invalid action")
+
     try:
         row_idx = ITEM_IDS.index(evt.item_id)
     except ValueError:
@@ -675,76 +652,56 @@ def interactions(evt: Interaction):
 
     item_vec = ITEM_VECS[row_idx]
     like = (evt.action == "like")
+    new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
 
-    # Update status in USER_ITEM_STATUS
-    new_status = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
     USER_ITEM_STATUS.setdefault(evt.user_id, {})
     USER_ITEM_STATUS[evt.user_id][evt.item_id] = new_status
 
-    if evt.user_id in USER_ACTIVE_ROW and USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"] == evt.item_id:
-        USER_ACTIVE_ROW[evt.user_id]["status"] = new_status
-        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
-        USER_HISTORY_ROWS[evt.user_id][evt.item_id] = USER_ACTIVE_ROW[evt.user_id].copy()
-        clear_active_row(evt.user_id)
+    USER_HISTORY_ROWS.setdefault(evt.user_id, {})
+    if evt.item_id not in USER_HISTORY_ROWS[evt.user_id]:
+        USER_HISTORY_ROWS[evt.user_id][evt.item_id] = {
+            "item": convert_path_to_url(ITEMS_META[evt.item_id]),
+            "status": new_status,
+            "position": len(USER_HISTORY_ROWS[evt.user_id]) + 1,
+            "ts": time.time(),
+        }
     else:
-        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
-        if evt.item_id not in USER_HISTORY_ROWS[evt.user_id]:
-            USER_HISTORY_ROWS[evt.user_id][evt.item_id] = {
-                "item": convert_path_to_url(ITEMS_META[evt.item_id]),
-                "status": new_status,
-                "position": len(USER_HISTORY_ROWS[evt.user_id]) + 1,
-                "ts": time.time(),
-            }
-        else:
-            USER_HISTORY_ROWS[evt.user_id][evt.item_id]["status"] = new_status
+        USER_HISTORY_ROWS[evt.user_id][evt.item_id]["status"] = new_status
 
-    set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
-    # ❌ REMOVED: Build fresh feed and update USER_CURRENT_FEED (this breaks CSV/frontend sync)
-    # The new feed will be loaded when frontend calls /feed again
-
-    # ── FIXED: CSV reads from OLD USER_CURRENT_FEED (what frontend is still showing)
-    # Only the status of the interacted item changes
-    lines = ["position,status,item_id,title"]
-    current_feed = USER_CURRENT_FEED.get(evt.user_id, [])
-    
-    if current_feed:
-        # Position 1: active item
-        active_item = current_feed[0]
-        item_id = str(active_item["item_id"]).replace('"', '""')
-        title = str(active_item.get("title", "")).replace('"', '""')
-        status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "active")
-        lines.append(f'1,{status},"{item_id}","{title}"')
-        
-        # Positions 2-10: pending items (unchanged until /feed is called)
-        for i, item in enumerate(current_feed[1:10], start=2):
-            item_id = str(item["item_id"]).replace('"', '""')
-            title = str(item.get("title", "")).replace('"', '""')
-            status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "pending")
-            lines.append(f'{i},{status},"{item_id}","{title}"')
-    
-    with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
-        f.write("\n".join(lines))
-
-    # Return the NEW feed for frontend to optionally use (but frontend doesn't have to refresh)
-    fresh = build_feed_items(
+    fresh_tail = build_feed_items(
         uid=evt.user_id,
         limit=10,
         exclude_seen=True,
         include_debug=True
     )
-    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
-    next_items = [i for i in fresh if i["item_id"] not in interacted]
-    
-    if next_items:
-        set_active_row(evt.user_id, next_items[0])
-        refresh_pending_rows(evt.user_id, next_items[1:])
-    
-    return {"ok": True, "next_feed": next_items[:10] if next_items else []}
+
+    locked_ids = {item["item_id"] for item in USER_LOCKED_FEED.get(evt.user_id, [])}
+    history_ids = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+
+    replacement_tail = []
+    for item in fresh_tail:
+        iid = item["item_id"]
+        if iid in locked_ids or iid in history_ids:
+            continue
+        replacement_tail.append({
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": 0,
+            "ts": time.time(),
+        })
+        if len(replacement_tail) == 4:
+            break
+
+    USER_PENDING_ROWS[evt.user_id] = replacement_tail
+
+    write_synced_csv(evt.user_id)
+    return {"ok": True}
 
 @app.get("/admin/users")
 def admin_users():
