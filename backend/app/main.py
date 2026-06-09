@@ -749,10 +749,19 @@ def interactions(evt: Interaction):
 
     # Every FEED_REFRESH_EVERY interactions, refresh the pending queue with
     # new algorithm results — but NEVER touch the currently active item.
+        # Every FEED_REFRESH_EVERY interactions, refresh the pending queue with
+    # new algorithm results — but NEVER touch the currently active item.
     if count % FEED_REFRESH_EVERY == 0:
         fresh = build_feed_items(uid=evt.user_id, limit=10, exclude_seen=True, include_debug=True)
         interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
-        next_items = [i for i in fresh if i["item_id"] not in interacted]
+        current_active_id = (
+            USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"]
+            if evt.user_id in USER_ACTIVE_ROW else None
+        )
+        next_items = [
+            i for i in fresh
+            if i["item_id"] not in interacted and i["item_id"] != current_active_id
+        ]
         # Active item is already set above — only replace pending
         set_pending_rows_from_items(evt.user_id, next_items)
         USER_CURRENT_FEED[evt.user_id] = next_items
