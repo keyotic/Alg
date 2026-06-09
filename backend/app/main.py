@@ -1,83 +1,75 @@
-import os, json, time
+import os
+import json
+import time
 import traceback
 import numpy as np
 import faiss
+from enum import Enum
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 
-
-
-# Go TWO levels up: backend/app/main.py -> backend/app -> backend -> AlgorithmCode (root)
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 
-
-
 ROOT_ARTIFACTS = os.path.join(PROJECT_ROOT, "artifacts")
 ROOT_DATA = os.path.join(PROJECT_ROOT, "data")
-
-
+ROOT_OUTPUT = os.path.join(PROJECT_ROOT, "output")
+os.makedirs(ROOT_OUTPUT, exist_ok=True)
 
 
 INDEX_PATH = os.getenv("INDEX_PATH", os.path.join(ROOT_ARTIFACTS, "faiss.index"))
 IDS_PATH = os.getenv("IDS_PATH", os.path.join(ROOT_ARTIFACTS, "item_ids.json"))
 VECTORS_PATH = os.getenv("VECTORS_PATH", os.path.join(ROOT_ARTIFACTS, "item_vectors.npy"))
 ITEMS_JSON = os.getenv("ITEMS_JSON", os.path.join(ROOT_DATA, "items.json"))
+CSV_PATH = os.getenv("CSV_PATH", os.path.join(ROOT_OUTPUT, "current_feed.csv"))
 
 
-
-
-# Load FAISS + metadata on startup
 index = faiss.read_index(INDEX_PATH)
 with open(IDS_PATH, "r") as f:
     ITEM_IDS = json.load(f)
-ITEM_VECS = np.load(VECTORS_PATH)  # (N, d)
+ITEM_VECS = np.load(VECTORS_PATH)
 with open(ITEMS_JSON, "r") as f:
     ITEMS_META = {it["item_id"]: it for it in json.load(f)}
 
 
-
-
-# Log orphaned IDs at startup — do NOT filter ITEM_IDS/ITEM_VECS
-# as FAISS row indices must stay perfectly aligned with ITEM_IDS
 orphans = [iid for iid in ITEM_IDS if iid not in ITEMS_META]
 if orphans:
     print(f"[startup] WARNING: {len(orphans)} orphaned IDs not in items.json: {orphans}")
 
 
-
-
 EMBED_DIM = ITEM_VECS.shape[1]
 
 
+class ItemStatus(str, Enum):
+    ACTIVE = "active"
+    PENDING = "pending"
+    LIKED = "liked"
+    SKIPPED = "skipped"
 
 
-# In-memory user vectors & seen set for demo
-USER_VEC = {}   # user_id -> np.array (d,)
-USER_SEEN = {}  # user_id -> set(item_id)
+USER_VEC = {}
+USER_SEEN = {}
+USER_HISTORY = {}
+USER_CURRENT_FEED = {}
+USER_FEED_INDEX = {}
+USER_ITEM_STATUS = {}
+USER_HISTORY_ROWS = {}
+USER_ACTIVE_ROW = {}
+USER_PENDING_ROWS = {}
 
 
-
-# Admin/debug tracking
-USER_HISTORY = {}       # user_id -> list of {"item_id": str, "action": str, "ts": float}
-USER_CURRENT_FEED = {}  # user_id -> list of item dicts (the live batch from last /feed call)
-USER_FEED_INDEX = {}    # user_id -> int (index of the item currently on screen)
 LAST_ACTIVE_USER = None
 LAST_ACTIVITY_AT = 0.0
 
 
-
-
 POPULARITY = {iid: 0.0 for iid in ITEM_IDS}
 CREATED_AT = {iid: time.time() for iid in ITEM_IDS}
-
-
 
 
 class FeedRequest(BaseModel):
@@ -86,37 +78,24 @@ class FeedRequest(BaseModel):
     exclude_seen: bool = True
 
 
-
-
 class Interaction(BaseModel):
     user_id: str
     item_id: str
-    action: str   # "like" or "skip"
-
-
+    action: str
 
 
 class Advance(BaseModel):
     user_id: str
-    item_id: str  # the item NOW on screen
-
-
+    item_id: str
 
 
 class ResetRequest(BaseModel):
     user_id: str
 
 
-
-
 app = FastAPI()
 
 
-
-
-# Exception middleware — MUST be added BEFORE CORSMiddleware
-# Ensures 500 errors still return CORS headers so the browser
-# can read the actual error message instead of a generic "Network Error"
 @app.middleware("http")
 async def catch_exceptions(request: Request, call_next):
     try:
@@ -130,9 +109,6 @@ async def catch_exceptions(request: Request, call_next):
         )
 
 
-
-
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -142,12 +118,7 @@ app.add_middleware(
 )
 
 
-
-
-# Serve images
 app.mount("/images", StaticFiles(directory=os.path.join(PROJECT_ROOT, "data", "images")), name="images")
-
-
 
 
 @app.get("/healthz")
@@ -155,38 +126,26 @@ def healthz():
     return {"ok": True, "count": len(ITEM_IDS)}
 
 
-
-
 def get_user_vec(uid: str):
     return USER_VEC.get(uid, None)
-
-
 
 
 def set_user_vec(uid: str, v):
     USER_VEC[uid] = v
 
 
-
-
 def mark_seen(uid: str, item_id: str):
     USER_SEEN.setdefault(uid, set()).add(item_id)
-
-
 
 
 def has_seen(uid: str, item_id: str):
     return item_id in USER_SEEN.get(uid, set())
 
 
-
-
 def mark_active(uid: str):
     global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
     LAST_ACTIVE_USER = uid
     LAST_ACTIVITY_AT = time.time()
-
-
 
 
 def log_interaction(uid: str, item_id: str, action: str):
@@ -197,6 +156,54 @@ def log_interaction(uid: str, item_id: str, action: str):
     })
 
 
+def ensure_history_row(uid: str, item: dict):
+    USER_HISTORY_ROWS.setdefault(uid, {})
+    item_id = item["item_id"]
+    if item_id not in USER_HISTORY_ROWS[uid]:
+        USER_HISTORY_ROWS[uid][item_id] = {
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": len(USER_HISTORY_ROWS[uid]) + 1,
+            "ts": time.time(),
+        }
+
+
+def set_history_status(uid: str, item_id: str, status: ItemStatus):
+    USER_HISTORY_ROWS.setdefault(uid, {})
+    if item_id in USER_HISTORY_ROWS[uid]:
+        USER_HISTORY_ROWS[uid][item_id]["status"] = status.value
+    USER_ITEM_STATUS.setdefault(uid, {})
+    USER_ITEM_STATUS[uid][item_id] = status.value
+
+
+def set_active_row(uid: str, item: dict):
+    USER_ACTIVE_ROW[uid] = {
+        "item": item.copy(),
+        "status": ItemStatus.ACTIVE.value,
+        "position": len(USER_HISTORY_ROWS.get(uid, {})) + 1,
+        "ts": time.time(),
+    }
+    USER_ITEM_STATUS.setdefault(uid, {})
+    USER_ITEM_STATUS[uid][item["item_id"]] = ItemStatus.ACTIVE.value
+
+
+def clear_active_row(uid: str):
+    USER_ACTIVE_ROW.pop(uid, None)
+
+
+def set_pending_rows(uid: str, items: list):
+    USER_PENDING_ROWS[uid] = []
+    for item in items:
+        USER_PENDING_ROWS[uid].append({
+            "item": item.copy(),
+            "status": ItemStatus.PENDING.value,
+            "position": 0,
+            "ts": time.time(),
+        })
+
+
+def get_item_status(uid: str, item_id: str):
+    return USER_ITEM_STATUS.get(uid, {}).get(item_id, ItemStatus.PENDING.value)
 
 
 def get_fortune_state(uid: str):
@@ -204,11 +211,9 @@ def get_fortune_state(uid: str):
     likes = [h for h in history if h["action"] == "like"]
     skips = [h for h in history if h["action"] == "skip"]
 
-
     like_count = len(likes)
     skip_count = len(skips)
     total = like_count + skip_count
-
 
     if total <= 1:
         return {
@@ -224,17 +229,15 @@ def get_fortune_state(uid: str):
                 "\"A hidden opportunity waits for you to make the first move.\"",
                 "\"The first sign is subtle… yet it will lead you somewhere rare.\"",
                 "\"What feels distant now… will soon draw unexpectedly close.\"",
-                "\"A quiet beginning is shaping a far greater destiny.\""
+                "\"A quiet beginning is shaping a far greater destiny.\"",
                 "\"Something small is already shifting in your favor.\"",
                 "\"The answer has not appeared… but the pattern has begun.\"",
                 "\"A new path opens the moment you decide to notice it.\""
             ]
         }
 
-
     like_ratio = like_count / total
     skip_ratio = skip_count / total
-
 
     if like_count >= 12 and like_ratio >= 0.7:
         return {
@@ -255,7 +258,7 @@ def get_fortune_state(uid: str):
                 "\"You are not waiting for the future. You are pulling it toward you.\"",
                 "\"A single fearless choice will set something powerful in motion.\"",
                 "\"You trust your instincts… and they are already aligning things in your favor.\"",
-                "\"What you claim without doubt… will begin to shape itself around you.\""
+                "\"What you claim without doubt… will begin to shape itself around you.\"",
                 "\"Opportunity recognizes your certainty… and moves closer because of it.\"",
                 "\"You are closer than you think… to something worth the risk.\"",
                 "\"Your momentum is building… and it will soon carry you further than expected.\"",
@@ -281,7 +284,7 @@ def get_fortune_state(uid: str):
                 "\"You are not missing out. You are refining what truly belongs to you.\"",
                 "\"By filtering the noise, you are making room for something rare.\"",
                 "\"What you release now… creates space for something more precise.\"",
-                "\"Your standards are rising… and your path is adjusting to match.\""
+                "\"Your standards are rising… and your path is adjusting to match.\"",
                 "\"You see what others overlook… and that awareness will guide you forward.\"",
                 "\"By choosing less… you are preparing to receive more of what matters.\"",
                 "\"Your patience is not empty… it is quietly aligning things in your favor.\"",
@@ -307,7 +310,7 @@ def get_fortune_state(uid: str):
                 "\"You are gathering signals from the future through what draws you in today.\"",
                 "\"A joyful instinct will soon prove wiser than logic alone.\"",
                 "\"Curiosity is guiding you… and it is leading somewhere worth arriving.\"",
-                "\"What you choose with lightness… will quietly shape something meaningful.\""
+                "\"What you choose with lightness… will quietly shape something meaningful.\"",
                 "\"You are following a feeling… and it is closer to truth than it seems.\"",
                 "\"Your attention is shifting… and new doors are adjusting to meet it.\"",
                 "\"The things that spark interest now… will soon begin to connect.\"",
@@ -350,7 +353,7 @@ def get_fortune_state(uid: str):
             "skip_ratio": skip_ratio,
             "pool": [
                 "\"You balance instinct and caution with rare precision. A meaningful choice is approaching.\"",
-                "\"You move carefully, but without fear… and that balance will serve you well\"",
+                "\"You move carefully, but without fear… and that balance will serve you well.\"",
                 "\"You are learning not only what you want, but why. That knowledge will shape your next chapter.\"",
                 "\"You stand between desire and discernment, and that is where wisdom grows.\"",
                 "\"A balanced heart often sees what others overlook.\"",
@@ -359,7 +362,7 @@ def get_fortune_state(uid: str):
                 "\"Your future is being built on thoughtful tension, and that makes it resilient.\"",
                 "\"The harmony between your curiosity and caution will soon reveal a clear answer.\"",
                 "\"You are holding both paths in view… and clarity is beginning to settle.\"",
-                "\"Balance is guiding you… quietly aligning your next decision.\""
+                "\"Balance is guiding you… quietly aligning your next decision.\"",
                 "\"You are neither rushing nor resisting… and that is shaping something steady.\"",
                 "\"Your awareness of both risks and rewards… will soon reveal the right moment.\"",
                 "\"You are finding center… and from there, your direction will strengthen.\"",
@@ -368,28 +371,14 @@ def get_fortune_state(uid: str):
         }
 
 
-
-
 def get_preview_fortune(uid: str):
     state = get_fortune_state(uid)
     pool = state["pool"]
     total = state["total"]
-
-
     if not pool:
         return None
-
-
     idx = min(total, len(pool) - 1)
     return pool[idx]
-
-
-
-
-def generate_personalized_fortune(uid: str):
-    return get_preview_fortune(uid)
-
-
 
 
 def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 0.8):
@@ -405,8 +394,6 @@ def update_user_vector(uid: str, item_vec: np.ndarray, like: bool, lam: float = 
         u /= np.linalg.norm(u) + 1e-8
     USER_VEC[uid] = u
     return u
-
-
 
 
 def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk: int):
@@ -427,23 +414,15 @@ def score_items(user_vec: np.ndarray, idxes: np.ndarray, sims: np.ndarray, topk:
     return scored[:topk]
 
 
-
-
 def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0.7):
     selected = []
     selected_vecs = []
     cand_items = [(item_id, score, row_idx) for (item_id, score, row_idx) in candidates]
-
-
     if not cand_items:
         return []
-
-
     first = cand_items[0]
     selected.append(first)
     selected_vecs.append(ITEM_VECS[first[2]])
-
-
     while len(selected) < min(topn, len(cand_items)):
         best_idx = None
         best_val = -1e9
@@ -467,8 +446,6 @@ def mmr_rerank(user_vec: np.ndarray, candidates: list, topn: int, lam: float = 0
     return selected
 
 
-
-
 def convert_path_to_url(item):
     result = item.copy()
     if result["path"].startswith("data/"):
@@ -476,8 +453,6 @@ def convert_path_to_url(item):
         base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
         result["path"] = f"{base_url}/images/{filename}"
     return result
-
-
 
 
 def serialize_item(item_id: str, score: float = None, row_idx: int = None):
@@ -491,12 +466,9 @@ def serialize_item(item_id: str, score: float = None, row_idx: int = None):
     return result
 
 
-
-
 def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, include_debug: bool = False):
     u = get_user_vec(uid)
     k_candidates = max(limit * 5, 100)
-
 
     if u is None:
         items = []
@@ -507,36 +479,19 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
                 items.append(item_id)
             if len(items) >= limit * 3:
                 break
-
-
         if include_debug:
             result = [serialize_item(i) for i in items[:limit]]
             return [x for x in result if x is not None]
-
-
         return [convert_path_to_url(ITEMS_META[i]) for i in items[:limit]]
 
-
     q = u.reshape(1, -1).astype("float32")
-
-
-    attempts = [
-        k_candidates,
-        k_candidates * 3,
-        k_candidates * 10,
-        len(ITEM_IDS)
-    ]
-
-
+    attempts = [k_candidates, k_candidates * 3, k_candidates * 10, len(ITEM_IDS)]
     cand = []
-
 
     for attempt_k in attempts:
         attempt_k = min(attempt_k, len(ITEM_IDS))
         sims, idxes = index.search(q, attempt_k)
         idxes, sims = idxes[0], sims[0]
-
-
         cand = [
             (ITEM_IDS[i], float(sims[j]), i)
             for j, i in enumerate(idxes)
@@ -544,19 +499,11 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             and ITEM_IDS[i] in ITEMS_META
             and (not exclude_seen or not has_seen(uid, ITEM_IDS[i]))
         ]
-
-
         if len(cand) >= limit:
             break
 
-
     if len(cand) < limit:
-        liked_seen = {
-            iid for iid in USER_SEEN.get(uid, set())
-            if POPULARITY.get(iid, 0.0) > 0
-        }
-
-
+        liked_seen = {iid for iid in USER_SEEN.get(uid, set()) if POPULARITY.get(iid, 0.0) > 0}
         sims, idxes = index.search(q, min(k_candidates, len(ITEM_IDS)))
         idxes, sims = idxes[0], sims[0]
         cand = [
@@ -567,75 +514,81 @@ def build_feed_items(uid: str, limit: int = 15, exclude_seen: bool = True, inclu
             and ITEM_IDS[i] not in liked_seen
         ]
 
-
     if len(cand) < limit:
         already = {c[0] for c in cand}
         for i, item_id in enumerate(ITEM_IDS):
-            if (
-                item_id in ITEMS_META
-                and item_id not in already
-                and item_id not in USER_SEEN.get(uid, set())
-            ):
+            if item_id in ITEMS_META and item_id not in already and item_id not in USER_SEEN.get(uid, set()):
                 sim = float(np.dot(u, ITEM_VECS[i]))
                 cand.append((item_id, sim, i))
             if len(cand) >= limit * 2:
                 break
 
-
     if not cand:
         return []
 
-
-    scored = score_items(
-        u,
-        np.array([c[2] for c in cand]),
-        np.array([c[1] for c in cand]),
-        len(cand)
-    )
+    scored = score_items(u, np.array([c[2] for c in cand]), np.array([c[1] for c in cand]), len(cand))
     reranked = mmr_rerank(u, scored, limit, lam=0.7)
 
-
     if include_debug:
-        result = [
-            serialize_item(iid, score=score, row_idx=row_idx)
-            for (iid, score, row_idx) in reranked
-            if iid in ITEMS_META
-        ]
+        result = [serialize_item(iid, score=score, row_idx=row_idx) for (iid, score, row_idx) in reranked if iid in ITEMS_META]
         return [x for x in result if x is not None]
 
-
-    return [
-        convert_path_to_url(ITEMS_META[iid])
-        for (iid, _, _) in reranked
-        if iid in ITEMS_META
-    ]
+    return [convert_path_to_url(ITEMS_META[iid]) for (iid, _, _) in reranked if iid in ITEMS_META]
 
 
+# ── FIXED: replaces old pending rows with new feed items,
+#    guarding against items already interacted with or currently active
+def refresh_pending_rows(uid: str, new_items: list):
+    """
+    Replace ONLY the pending slots (positions 2–10).
+    The active item (position 1, currently in USER_ACTIVE_ROW) is NEVER replaced.
+    Interacted items (in USER_HISTORY_ROWS) are also protected.
+    """
+    interacted = set(USER_HISTORY_ROWS.get(uid, {}).keys())
+    active_id = (
+        USER_ACTIVE_ROW[uid]["item"]["item_id"]
+        if uid in USER_ACTIVE_ROW else None
+    )
+
+    # new_items comes from build_feed_items as the full feed [active, pending1, pending2, ...]
+    # We want to keep active_id as the first item, and only replace the rest
+    new_pending = []
+    for item in new_items:
+        iid = item["item_id"]
+        # Skip interacted items AND skip the currently active item
+        if iid not in interacted and iid != active_id:
+            new_pending.append({
+                "item": item.copy(),
+                "status": ItemStatus.PENDING.value,
+                "position": 0,
+                "ts": time.time(),
+            })
+
+    USER_PENDING_ROWS[uid] = new_pending
 
 
-def get_current_feed_preview(uid: str, limit: int = 8, include_active: bool = True):
-    stored_feed = USER_CURRENT_FEED.get(uid)
+def rebuild_csv_state(uid: str):
+    rows = []
+    history = USER_HISTORY_ROWS.get(uid, {})
+    for rec in sorted(history.values(), key=lambda r: r["ts"]):
+        rows.append(rec.copy())
 
-    if not stored_feed:
-        return []
+    active = USER_ACTIVE_ROW.get(uid)
+    if active:
+        rows.append(active.copy())
 
-    current_idx = USER_FEED_INDEX.get(uid, 0)
+    pending = USER_PENDING_ROWS.get(uid, [])
+    rows.extend([r.copy() for r in pending])
 
-    if include_active:
-        feed_slice = stored_feed[current_idx:]
-    else:
-        feed_slice = stored_feed[current_idx + 1:]
+    for i, row in enumerate(rows, start=1):
+        row["position"] = i
 
-    feed_slice = feed_slice[:limit]
+    USER_ITEM_STATUS.setdefault(uid, {})
+    USER_ITEM_STATUS[uid] = {}
+    for row in rows:
+        USER_ITEM_STATUS[uid][row["item"]["item_id"]] = row["status"]
 
-    annotated = []
-    for i, item in enumerate(feed_slice):
-        item = item.copy()
-        item["position"] = current_idx + i + 1
-        item["is_active"] = (i == 0)
-        annotated.append(item)
-
-    return annotated
+    return rows
 
 
 
@@ -650,7 +603,67 @@ def feed(req: FeedRequest):
             exclude_seen=req.exclude_seen,
             include_debug=True
         )
+
         USER_CURRENT_FEED[req.user_id] = items
+        USER_HISTORY_ROWS.setdefault(req.user_id, {})
+        USER_PENDING_ROWS.setdefault(req.user_id, [])
+        USER_ITEM_STATUS.setdefault(req.user_id, {})
+
+        if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
+            # First load
+            if items:
+                set_active_row(req.user_id, items[0])
+                refresh_pending_rows(req.user_id, items[1:])
+            else:
+                refresh_pending_rows(req.user_id, [])
+        else:
+            # New feed after interaction — replace pending
+            interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
+            active_id = (
+                USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
+                if req.user_id in USER_ACTIVE_ROW else None
+            )
+            new_pending = [
+                i for i in items
+                if i["item_id"] not in interacted and i["item_id"] != active_id
+            ]
+            refresh_pending_rows(req.user_id, new_pending)
+
+        # ── FIXED: CSV always mirrors USER_CURRENT_FEED exactly
+        # Build CSV rows from the actual feed returned to frontend
+        csv_rows = []
+        
+        # Active item (position 1)
+        if USER_ACTIVE_ROW.get(req.user_id):
+            active = USER_ACTIVE_ROW[req.user_id]
+            csv_rows.append({
+                "position": 1,
+                "status": active["status"],
+                "item_id": active["item"]["item_id"],
+                "title": active["item"].get("title", ""),
+            })
+        
+        # Pending items (positions 2–10)
+        for i, pending in enumerate(USER_PENDING_ROWS.get(req.user_id, []), start=2):
+            if i > 10:  # Only log first 9 pending items (positions 2–10)
+                break
+            csv_rows.append({
+                "position": i,
+                "status": pending["status"],
+                "item_id": pending["item"]["item_id"],
+                "title": pending["item"].get("title", ""),
+            })
+        
+        # Write CSV
+        lines = ["position,status,item_id,title"]
+        for row in csv_rows:
+            item_id = str(row["item_id"]).replace('"', '""')
+            title = str(row["title"]).replace('"', '""')
+            lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
+        
+        with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+            f.write("\n".join(lines))
+
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         return {"items": clean}
     except Exception as e:
@@ -658,27 +671,16 @@ def feed(req: FeedRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
 @app.post("/advance")
 def advance(req: Advance):
     mark_active(req.user_id)
-
-    stored_feed = USER_CURRENT_FEED.get(req.user_id, [])
-    for i, item in enumerate(stored_feed):
-        if item.get("item_id") == req.item_id:
-            USER_FEED_INDEX[req.user_id] = i
-            return {"ok": True}
-
+    USER_FEED_INDEX[req.user_id] = 0
     return {"ok": True}
-
-
 
 
 @app.post("/interactions")
 def interactions(evt: Interaction):
     mark_active(evt.user_id)
-
 
     if evt.action not in ("like", "skip"):
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -687,60 +689,79 @@ def interactions(evt: Interaction):
     except ValueError:
         raise HTTPException(status_code=404, detail="Unknown item_id")
 
-
     item_vec = ITEM_VECS[row_idx]
     like = (evt.action == "like")
     update_user_vector(evt.user_id, item_vec, like)
     mark_seen(evt.user_id, evt.item_id)
     log_interaction(evt.user_id, evt.item_id, evt.action)
+
+    if evt.user_id in USER_ACTIVE_ROW and USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"] == evt.item_id:
+        USER_ACTIVE_ROW[evt.user_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
+        USER_HISTORY_ROWS[evt.user_id][evt.item_id] = USER_ACTIVE_ROW[evt.user_id].copy()
+        clear_active_row(evt.user_id)
+    else:
+        USER_HISTORY_ROWS.setdefault(evt.user_id, {})
+        if evt.item_id not in USER_HISTORY_ROWS[evt.user_id]:
+            USER_HISTORY_ROWS[evt.user_id][evt.item_id] = {
+                "item": convert_path_to_url(ITEMS_META[evt.item_id]),
+                "status": ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value,
+                "position": len(USER_HISTORY_ROWS[evt.user_id]) + 1,
+                "ts": time.time(),
+            }
+        else:
+            USER_HISTORY_ROWS[evt.user_id][evt.item_id]["status"] = ItemStatus.LIKED.value if like else ItemStatus.SKIPPED.value
+
+    set_history_status(evt.user_id, evt.item_id, ItemStatus.LIKED if like else ItemStatus.SKIPPED)
     POPULARITY[evt.item_id] = POPULARITY.get(evt.item_id, 0.0) + (1.0 if like else 0.0)
 
+    fresh = build_feed_items(
+        uid=evt.user_id,
+        limit=10,
+        exclude_seen=True,
+        include_debug=True
+    )
+
+    interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+    next_items = [i for i in fresh if i["item_id"] not in interacted]
+
+    if next_items:
+        set_active_row(evt.user_id, next_items[0])
+        refresh_pending_rows(evt.user_id, next_items[1:])
+    else:
+        clear_active_row(evt.user_id)
+        refresh_pending_rows(evt.user_id, [])
+
+    # ── FIXED: CSV mirrors exactly what frontend sees (active + first 9 pending)
+    csv_rows = []
+    if USER_ACTIVE_ROW.get(evt.user_id):
+        active = USER_ACTIVE_ROW[evt.user_id]
+        csv_rows.append({
+            "position": 1,
+            "status": active["status"],
+            "item_id": active["item"]["item_id"],
+            "title": active["item"].get("title", ""),
+        })
+    for i, pending in enumerate(USER_PENDING_ROWS.get(evt.user_id, []), start=2):
+        if i > 10:  # Only positions 2–10
+            break
+        csv_rows.append({
+            "position": i,
+            "status": pending["status"],
+            "item_id": pending["item"]["item_id"],
+            "title": pending["item"].get("title", ""),
+        })
+
+    lines = ["position,status,item_id,title"]
+    for row in csv_rows:
+        item_id = str(row["item_id"]).replace('"', '""')
+        title = str(row["title"]).replace('"', '""')
+        lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
+
+    with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(lines))
 
     return {"ok": True}
-
-
-
-
-@app.get("/fortune/{user_id}")
-def get_fortune(user_id: str):
-    history = USER_HISTORY.get(user_id, [])
-    state = get_fortune_state(user_id)
-    preview = get_preview_fortune(user_id)
-    return {
-        "user_id": user_id,
-        "history_count": len(history),
-        "segment": state["segment"],
-        "fortune": preview,
-        "fortune_preview": preview,
-        "fortune_pool_size": len(state["pool"]),
-        "fortune_total_interactions": state["total"],
-        "fortune_like_ratio": state["like_ratio"],
-        "fortune_skip_ratio": state["skip_ratio"],
-    }
-
-
-
-
-@app.post("/reset")
-def reset(req: ResetRequest):
-    global LAST_ACTIVE_USER, LAST_ACTIVITY_AT
-
-
-    USER_VEC.pop(req.user_id, None)
-    USER_SEEN.pop(req.user_id, None)
-    USER_HISTORY.pop(req.user_id, None)
-    USER_CURRENT_FEED.pop(req.user_id, None)
-    USER_FEED_INDEX.pop(req.user_id, None)
-
-
-    if LAST_ACTIVE_USER == req.user_id:
-        LAST_ACTIVE_USER = None
-        LAST_ACTIVITY_AT = 0.0
-
-
-    return {"ok": True}
-
-
 
 
 @app.get("/admin/users")
@@ -763,16 +784,13 @@ def admin_users():
     }
 
 
-
-
 @app.get("/admin/user/{user_id}")
 def admin_user_detail(user_id: str):
     history = USER_HISTORY.get(user_id, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(user_id)
-    current_feed = get_current_feed_preview(user_id, limit=8, include_active=True)
-
+    csv_rows = rebuild_csv_state(user_id)
 
     return {
         "user_id": user_id,
@@ -791,10 +809,9 @@ def admin_user_detail(user_id: str):
         "fortune_total_interactions": state["total"],
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
-        "current_feed": current_feed,
+        "csv_rows": csv_rows,
+        "item_status": USER_ITEM_STATUS.get(user_id, {}),
     }
-
-
 
 
 @app.get("/admin/current-user")
@@ -816,17 +833,16 @@ def admin_current_user():
             "fortune_total_interactions": 0,
             "fortune_like_ratio": 0.0,
             "fortune_skip_ratio": 0.0,
-            "current_feed": [],
+            "csv_rows": [],
+            "item_status": {},
         }
-
 
     uid = LAST_ACTIVE_USER
     history = USER_HISTORY.get(uid, [])
     liked = [h["item_id"] for h in history if h["action"] == "like"]
     skipped = [h["item_id"] for h in history if h["action"] == "skip"]
     state = get_fortune_state(uid)
-    current_feed = get_current_feed_preview(uid, limit=8, include_active=True)
-
+    csv_rows = rebuild_csv_state(uid)
 
     return {
         "active_user": uid,
@@ -844,10 +860,9 @@ def admin_current_user():
         "fortune_total_interactions": state["total"],
         "fortune_like_ratio": state["like_ratio"],
         "fortune_skip_ratio": state["skip_ratio"],
-        "current_feed": current_feed,
+        "csv_rows": csv_rows,
+        "item_status": USER_ITEM_STATUS.get(uid, {}),
     }
-
-
 
 
 @app.get("/admin/popularity")
@@ -862,16 +877,12 @@ def admin_popularity():
     }
 
 
-
-
 @app.get("/admin/current-feed/{user_id}")
 def admin_current_feed(user_id: str, limit: int = 8):
     return {
         "user_id": user_id,
         "current_feed": get_current_feed_preview(user_id, limit=limit, include_active=True)
     }
-
-
 
 
 @app.post("/admin/preview-feed/{user_id}")
@@ -885,21 +896,20 @@ def admin_preview_feed(user_id: str, limit: int = 15):
     return {"items": items}
 
 
-
-
 @app.get("/admin/feed.csv")
 def admin_feed_csv():
     if not LAST_ACTIVE_USER:
-        content = "#,status,item_id,title\n"
+        content = "position,status,item_id,title\n"
     else:
-        items = get_current_feed_preview(LAST_ACTIVE_USER, limit=15, include_active=True)
-        lines = ["#,status,item_id,title"]
-        for item in items:
-            status  = "ACTIVE" if item.get("is_active") else f"next {(item.get('position', 1) - 1)}"
+        rows = rebuild_csv_state(LAST_ACTIVE_USER)
+        lines = ["position,status,item_id,title"]
+        for row in rows:
+            item = row["item"]
             item_id = str(item.get("item_id", "")).replace('"', '""')
-            title   = str(item.get("title",   "")).replace('"', '""')
-            lines.append(f'{item.get("position", "")},{status},"{item_id}","{title}"')
+            title = str(item.get("title", "")).replace('"', '""')
+            lines.append(f'{row["position"]},{row["status"]},"{item_id}","{title}"')
         content = "\n".join(lines)
+
     return Response(
         content=content,
         media_type="text/csv",
