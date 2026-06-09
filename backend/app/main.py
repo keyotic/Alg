@@ -728,17 +728,14 @@ def interactions(evt: Interaction):
     USER_INTERACTION_COUNT[evt.user_id] += 1
     count = USER_INTERACTION_COUNT[evt.user_id]
 
-    # Promote next pending item to active
-    pending = USER_PENDING_ROWS.get(evt.user_id, [])
-    if pending:
-        next_item_row = pending[0]
-        USER_PENDING_ROWS[evt.user_id] = pending[1:]
-        set_active_row(evt.user_id, next_item_row["item"])
-    else:
-        # Pending queue is empty — must fetch new items regardless of counter
+    # On every FEED_REFRESH_EVERY-th interaction, the old queue is expired.
+    # We must fetch a brand new feed FIRST, then set its first item as active.
+    # On all other interactions, we simply promote the next existing pending item.
+    if count % FEED_REFRESH_EVERY == 0:
         fresh = build_feed_items(uid=evt.user_id, limit=10, exclude_seen=True, include_debug=True)
         interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
         next_items = [i for i in fresh if i["item_id"] not in interacted]
+
         if next_items:
             set_active_row(evt.user_id, next_items[0])
             set_pending_rows_from_items(evt.user_id, next_items[1:])
@@ -746,25 +743,26 @@ def interactions(evt: Interaction):
         else:
             clear_active_row(evt.user_id)
             USER_PENDING_ROWS[evt.user_id] = []
-
-    # Every FEED_REFRESH_EVERY interactions, refresh the pending queue with
-    # new algorithm results — but NEVER touch the currently active item.
-        # Every FEED_REFRESH_EVERY interactions, refresh the pending queue with
-    # new algorithm results — but NEVER touch the currently active item.
-    if count % FEED_REFRESH_EVERY == 0:
-        fresh = build_feed_items(uid=evt.user_id, limit=10, exclude_seen=True, include_debug=True)
-        interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
-        current_active_id = (
-            USER_ACTIVE_ROW[evt.user_id]["item"]["item_id"]
-            if evt.user_id in USER_ACTIVE_ROW else None
-        )
-        next_items = [
-            i for i in fresh
-            if i["item_id"] not in interacted and i["item_id"] != current_active_id
-        ]
-        # Active item is already set above — only replace pending
-        set_pending_rows_from_items(evt.user_id, next_items)
-        USER_CURRENT_FEED[evt.user_id] = next_items
+            USER_CURRENT_FEED[evt.user_id] = []
+    else:
+        pending = USER_PENDING_ROWS.get(evt.user_id, [])
+        if pending:
+            next_item_row = pending[0]
+            USER_PENDING_ROWS[evt.user_id] = pending[1:]
+            set_active_row(evt.user_id, next_item_row["item"])
+        else:
+            # Pending queue unexpectedly empty — rebuild immediately
+            fresh = build_feed_items(uid=evt.user_id, limit=10, exclude_seen=True, include_debug=True)
+            interacted = set(USER_HISTORY_ROWS.get(evt.user_id, {}).keys())
+            next_items = [i for i in fresh if i["item_id"] not in interacted]
+            if next_items:
+                set_active_row(evt.user_id, next_items[0])
+                set_pending_rows_from_items(evt.user_id, next_items[1:])
+                USER_CURRENT_FEED[evt.user_id] = next_items
+            else:
+                clear_active_row(evt.user_id)
+                USER_PENDING_ROWS[evt.user_id] = []
+                USER_CURRENT_FEED[evt.user_id] = []
 
     write_user_feed_csv(evt.user_id)
 
