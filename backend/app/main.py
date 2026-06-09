@@ -590,7 +590,32 @@ def rebuild_csv_state(uid: str):
 
     return rows
 
+# ── helper: write CSV from actual frontend state (active + pending rows)
+def write_csv_from_frontend_state(uid: str):
+    lines = ["position,status,item_id,title"]
+    pos = 1
 
+    # Position 1: the active item (what's currently shown on screen)
+    active = USER_ACTIVE_ROW.get(uid)
+    if active:
+        item = active["item"]
+        item_id = str(item.get("item_id", "")).replace('"', '""')
+        title   = str(item.get("title", "")).replace('"', '""')
+        status  = active["status"]                          # "active" (or liked/skipped if race)
+        lines.append(f'{pos},{status},"{item_id}","{title}"')
+        pos += 1
+
+    # Positions 2–N: the pending queue (exactly what the frontend will show next)
+    for row in USER_PENDING_ROWS.get(uid, []):
+        item = row["item"]
+        item_id = str(item.get("item_id", "")).replace('"', '""')
+        title   = str(item.get("title", "")).replace('"', '""')
+        status  = row["status"]                             # always "pending"
+        lines.append(f'{pos},{status},"{item_id}","{title}"')
+        pos += 1
+
+    with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(lines))
 
 
 @app.post("/feed")
@@ -610,12 +635,16 @@ def feed(req: FeedRequest):
         USER_ITEM_STATUS.setdefault(req.user_id, {})
 
         if not USER_HISTORY_ROWS[req.user_id] and req.user_id not in USER_ACTIVE_ROW:
+            # Fresh session — set active + pending from feed
             if items:
                 set_active_row(req.user_id, items[0])
                 refresh_pending_rows(req.user_id, items[1:])
             else:
                 refresh_pending_rows(req.user_id, [])
         else:
+            # Returning user on refresh — KEEP the existing active row intact.
+            # Only refresh the pending queue with new algorithm results,
+            # excluding anything already interacted with or currently active.
             interacted = set(USER_HISTORY_ROWS[req.user_id].keys())
             active_id = (
                 USER_ACTIVE_ROW[req.user_id]["item"]["item_id"]
@@ -626,28 +655,10 @@ def feed(req: FeedRequest):
                 if i["item_id"] not in interacted and i["item_id"] != active_id
             ]
             refresh_pending_rows(req.user_id, new_pending)
+            # ↑ USER_ACTIVE_ROW is intentionally NOT touched on refresh
 
-        # ── FIXED: CSV built directly from USER_CURRENT_FEED (exact frontend feed)
-        lines = ["position,status,item_id,title"]
-        
-        # Position 1: first item (active)
-        if items:
-            active_item = items[0]
-            item_id = str(active_item["item_id"]).replace('"', '""')
-            title = str(active_item.get("title", "")).replace('"', '""')
-            # Status is ACTIVE unless it's already in history as liked/skipped
-            status = USER_ITEM_STATUS.get(req.user_id, {}).get(item_id, "active")
-            lines.append(f'1,{status},"{item_id}","{title}"')
-        
-        # Positions 2-10: items 2-10 from feed (pending)
-        for i, item in enumerate(items[1:10], start=2):
-            item_id = str(item["item_id"]).replace('"', '""')
-            title = str(item.get("title", "")).replace('"', '""')
-            status = USER_ITEM_STATUS.get(req.user_id, {}).get(item_id, "pending")
-            lines.append(f'{i},{status},"{item_id}","{title}"')
-        
-        with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
-            f.write("\n".join(lines))
+        # Write CSV from the real frontend state, not from the algorithm output
+        write_csv_from_frontend_state(req.user_id)
 
         clean = [{k: v for k, v in item.items() if k not in ("score", "row_idx")} for item in items]
         return {"items": clean}
@@ -726,27 +737,8 @@ def interactions(evt: Interaction):
     # ── FIXED: Update USER_CURRENT_FEED so CSV reads from the new feed
     USER_CURRENT_FEED[evt.user_id] = next_items[:10] if next_items else []
 
-    # CSV built from USER_CURRENT_FEED (now updated with new feed)
-    lines = ["position,status,item_id,title"]
-    current_feed = USER_CURRENT_FEED.get(evt.user_id, [])
-    
-    if current_feed:
-        # Position 1: active item
-        active_item = current_feed[0]
-        item_id = str(active_item["item_id"]).replace('"', '""')
-        title = str(active_item.get("title", "")).replace('"', '""')
-        status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "active")
-        lines.append(f'1,{status},"{item_id}","{title}"')
-        
-        # Positions 2-10: pending items
-        for i, item in enumerate(current_feed[1:10], start=2):
-            item_id = str(item["item_id"]).replace('"', '""')
-            title = str(item.get("title", "")).replace('"', '""')
-            status = USER_ITEM_STATUS.get(evt.user_id, {}).get(item_id, "pending")
-            lines.append(f'{i},{status},"{item_id}","{title}"')
-    
-    with open(CSV_PATH, "w", encoding="utf-8", newline="") as f:
-        f.write("\n".join(lines))
+        # Write CSV from the real frontend state (active + pending already updated above)
+    write_csv_from_frontend_state(evt.user_id)
 
     return {"ok": True}
 
