@@ -238,17 +238,11 @@
     <div class="hero">
       <div class="hero-top">
         <div>
-          <h1>Live Admin Dashboard</h1>
-          <p class="meta">Backend: <span id="apiBase"></span></p>
-          <p class="meta">Refresh interval: every 2 seconds</p>
+          <h1>Algoracle</h1>
           <p class="meta">Last refresh: <span id="lastRefresh">—</span></p>
         </div>
 
-        <div class="toolbar">
-          <div class="badge"><span class="dot"></span> Live polling enabled</div>
-          <button id="refreshBtn">Refresh now</button>
-          <button id="toggleBtn" class="secondary">Pause auto-refresh</button>
-        </div>
+        
       </div>
 
       <div id="currentUserStatus" class="status loading">Loading current active user...</div>
@@ -259,24 +253,12 @@
           <div class="value" id="summaryUser">—</div>
         </div>
         <div class="summary-card">
-          <div class="label">Has vector</div>
-          <div class="value" id="summaryVector">—</div>
-        </div>
-        <div class="summary-card">
-          <div class="label">Seen</div>
-          <div class="value" id="summarySeen">0</div>
-        </div>
-        <div class="summary-card">
           <div class="label">Likes</div>
           <div class="value" id="summaryLikes">0</div>
         </div>
         <div class="summary-card">
           <div class="label">Skips</div>
           <div class="value" id="summarySkips">0</div>
-        </div>
-        <div class="summary-card">
-          <div class="label">Last activity</div>
-          <div class="value" id="summaryActivity" style="font-size: 15px;">—</div>
         </div>
       </div>
     </div>
@@ -290,30 +272,6 @@
           <div class="fortune-label">Current possible fortune</div>
           <blockquote id="fortunePreviewText">No active user right now.</blockquote>
         </div>
-
-        <div class="fortune-meta">
-          <div class="fortune-meta-list">
-            <div class="fortune-meta-item">
-              <div class="label">Segment</div>
-              <div class="value" id="fortuneSegment">—</div>
-            </div>
-            <div class="fortune-meta-item">
-              <div class="label">Pool size</div>
-              <div class="value" id="fortunePoolSize">0</div>
-            </div>
-            <div class="fortune-meta-item">
-              <div class="label">Total interactions</div>
-              <div class="value" id="fortuneTotalInteractions">0</div>
-            </div>
-            <div class="fortune-meta-item">
-              <div class="label">Like ratio</div>
-              <div class="value" id="fortuneLikeRatio">0%</div>
-            </div>
-            <div class="fortune-meta-item">
-              <div class="label">Skip ratio</div>
-              <div class="value" id="fortuneSkipRatio">0%</div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
