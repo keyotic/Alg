@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Admin Dashboard</title>
+  <title>Algoracle</title>
   <style>
     :root {
       --bg: #f6f7fb;
@@ -18,9 +18,6 @@
       --error: #c62828;
       --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
       --radius: 16px;
-      --active-bg: #f0fdf4;
-      --active-border: #bfe8cf;
-      --active-text: #0b6b3a;
     }
 
     * { box-sizing: border-box; }
@@ -107,9 +104,6 @@
       padding: 20px;
       margin-bottom: 24px;
     }
-
-    .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px; align-items: start; }
-    .stack { display: grid; gap: 24px; }
 
     .status { margin-top: 8px; font-size: 14px; }
     .loading { color: var(--muted); }
@@ -210,39 +204,6 @@
     th { background: #f3f6fb; }
     td code { font-family: Consolas, monospace; font-size: 13px; word-break: break-word; }
 
-    /* Active item row highlight */
-    tr.active-row { background: var(--active-bg) !important; }
-    tr.active-row td { border-color: var(--active-border); }
-
-    .active-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: #e8f7ef;
-      color: var(--active-text);
-      border: 1px solid var(--active-border);
-      border-radius: 999px;
-      padding: 3px 9px;
-      font-size: 11px;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .active-badge .dot-active {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--active-text);
-      display: inline-block;
-      animation: pulse 1.4s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.35; }
-    }
-
     .scroll { overflow-x: auto; }
     .muted { color: var(--muted); }
 
@@ -258,18 +219,7 @@
     .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
     .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
 
-    .thumb {
-      width: 56px;
-      height: 56px;
-      object-fit: cover;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #f3f6fb;
-    }
-
-
     @media (max-width: 980px) {
-      .grid { grid-template-columns: 1fr; }
       .summary { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
       .fortune-grid { grid-template-columns: 1fr; }
     }
@@ -280,7 +230,6 @@
       .summary { grid-template-columns: 1fr; }
       th, td { font-size: 13px; padding: 9px 10px; }
       .fortune-box blockquote { font-size: 17px; }
-      .thumb { width: 48px; height: 48px; }
     }
   </style>
 </head>
@@ -370,86 +319,21 @@
     </div>
 
     <div class="section">
-      <h2>Current Feed</h2>
-      <p class="muted">The first row is the item currently being shown to the active user. The rows below are queued next. Watch this update live after each interaction.</p>
+      <h3>Interaction History</h3>
       <div class="scroll">
-        <table id="currentFeedTable">
+        <table id="historyTable">
           <thead>
             <tr>
               <th>#</th>
-              <th>Status</th>
               <th>Item ID</th>
-              <th>Title</th>
+              <th>Action</th>
+              <th>Timestamp</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-      <div id="currentFeedEmpty" class="empty" style="display:none;">No current feed preview available for the active user.</div>
-    </div>
-
-    <div class="section">
-      <h2>Current Active User</h2>
-      <div class="scroll">
-        <table id="currentUserTable">
-          <thead>
-            <tr>
-              <th>Active User</th>
-              <th>Has Vector</th>
-              <th>Total Seen</th>
-              <th>Liked Count</th>
-              <th>Skipped Count</th>
-              <th>Last Activity</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div id="currentUserEmpty" class="empty" style="display:none;">No active user right now.</div>
-    </div>
-
-    <div class="grid">
-      <div class="stack">
-        <div class="section">
-          <h3>Liked Items</h3>
-          <div class="scroll">
-            <table id="likedTable">
-              <thead><tr><th>Item ID</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div id="likedEmpty" class="empty" style="display:none;">No liked items recorded for the active user.</div>
-        </div>
-
-        <div class="section">
-          <h3>Skipped Items</h3>
-          <div class="scroll">
-            <table id="skippedTable">
-              <thead><tr><th>Item ID</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div id="skippedEmpty" class="empty" style="display:none;">No skipped items recorded for the active user.</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h3>Interaction History</h3>
-        <div class="scroll">
-          <table id="historyTable">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Item ID</th>
-                <th>Action</th>
-                <th>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
-      </div>
+      <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
     </div>
   </div>
 
@@ -479,7 +363,6 @@
       const tbody = document.querySelector(`#${tableId} tbody`);
       const tr = document.createElement("tr");
       if (rowClass) tr.className = rowClass;
-
       cells.forEach(cell => {
         const td = document.createElement("td");
         if (cell instanceof HTMLElement) {
@@ -493,7 +376,6 @@
         }
         tr.appendChild(td);
       });
-
       tbody.appendChild(tr);
     }
 
@@ -506,99 +388,39 @@
       return `${Math.round(value * 100)}%`;
     }
 
-    function formatScore(value) {
-      if (typeof value !== "number" || Number.isNaN(value)) return "—";
-      return value.toFixed(4);
-    }
-
     function formatTimestamp(ts) {
       if (!ts) return "";
       return new Date(ts * 1000).toLocaleString();
     }
 
-    function createThumb(path, title) {
-      const img = document.createElement("img");
-      img.className = "thumb";
-      img.src = path || "";
-      img.alt = title || "Preview image";
-      img.loading = "lazy";
-      img.referrerPolicy = "no-referrer";
-      img.onerror = () => { img.style.display = "none"; };
-      return img;
-    }
-
-    function createActiveBadge() {
-      const badge = document.createElement("span");
-      badge.className = "active-badge";
-      const dot = document.createElement("span");
-      dot.className = "dot-active";
-      badge.appendChild(dot);
-      badge.appendChild(document.createTextNode(" Active"));
-      return badge;
-    }
-
-    function createNextLabel(position) {
-      const span = document.createElement("span");
-      span.className = "muted";
-      span.style.fontSize = "12px";
-      span.textContent = `Next ${position - 1}`;
-      return span;
-    }
-
     function setSummary(data) {
-      document.getElementById("summaryUser").textContent = data?.active_user || "—";
+      document.getElementById("summaryUser").textContent = data?.active_user || "\u2014";
       document.getElementById("summaryVector").textContent =
-        data?.active_user ? String(Boolean(data.has_vector)) : "—";
+        data?.active_user ? String(Boolean(data.has_vector)) : "\u2014";
       document.getElementById("summarySeen").textContent = data?.total_seen ?? 0;
       document.getElementById("summaryLikes").textContent = data?.liked_count ?? 0;
       document.getElementById("summarySkips").textContent = data?.skipped_count ?? 0;
       document.getElementById("summaryActivity").textContent =
-        formatTimestamp(data?.last_activity_at) || "—";
+        formatTimestamp(data?.last_activity_at) || "\u2014";
     }
 
     function resetSummary() {
-      setSummary({
-        active_user: null,
-        has_vector: false,
-        total_seen: 0,
-        liked_count: 0,
-        skipped_count: 0,
-        last_activity_at: null
-      });
+      setSummary({ active_user: null, has_vector: false, total_seen: 0, liked_count: 0, skipped_count: 0, last_activity_at: null });
     }
 
     function setFortunePreview(data) {
       const hasUser = Boolean(data?.active_user);
-
       document.getElementById("fortunePreviewText").textContent =
         hasUser ? (data?.fortune_preview || "No preview fortune available.") : "No active user right now.";
-
-      document.getElementById("fortuneSegment").textContent =
-        hasUser ? (data?.fortune_segment || "—") : "—";
-
-      document.getElementById("fortunePoolSize").textContent =
-        hasUser ? String(data?.fortune_pool_size ?? 0) : "0";
-
-      document.getElementById("fortuneTotalInteractions").textContent =
-        hasUser ? String(data?.fortune_total_interactions ?? 0) : "0";
-
-      document.getElementById("fortuneLikeRatio").textContent =
-        hasUser ? formatPercent(data?.fortune_like_ratio ?? 0) : "0%";
-
-      document.getElementById("fortuneSkipRatio").textContent =
-        hasUser ? formatPercent(data?.fortune_skip_ratio ?? 0) : "0%";
+      document.getElementById("fortuneSegment").textContent = hasUser ? (data?.fortune_segment || "\u2014") : "\u2014";
+      document.getElementById("fortunePoolSize").textContent = hasUser ? String(data?.fortune_pool_size ?? 0) : "0";
+      document.getElementById("fortuneTotalInteractions").textContent = hasUser ? String(data?.fortune_total_interactions ?? 0) : "0";
+      document.getElementById("fortuneLikeRatio").textContent = hasUser ? formatPercent(data?.fortune_like_ratio ?? 0) : "0%";
+      document.getElementById("fortuneSkipRatio").textContent = hasUser ? formatPercent(data?.fortune_skip_ratio ?? 0) : "0%";
     }
 
     function resetFortunePreview() {
-      setFortunePreview({
-        active_user: null,
-        fortune_preview: null,
-        fortune_segment: null,
-        fortune_pool_size: 0,
-        fortune_total_interactions: 0,
-        fortune_like_ratio: 0,
-        fortune_skip_ratio: 0
-      });
+      setFortunePreview({ active_user: null, fortune_preview: null, fortune_segment: null, fortune_pool_size: 0, fortune_total_interactions: 0, fortune_like_ratio: 0, fortune_skip_ratio: 0 });
     }
 
     function updateLastRefresh() {
@@ -625,91 +447,23 @@
     }
 
     function clearAllTables() {
-      clearTableBody("currentUserTable");
-      clearTableBody("likedTable");
-      clearTableBody("skippedTable");
       clearTableBody("historyTable");
-      clearTableBody("currentFeedTable");
-    }
-
-    function renderCurrentFeed(items) {
-      if ((items || []).length) {
-        items.forEach((item) => {
-          const isActive = item.is_active === true;
-          const position = item.position ?? (items.indexOf(item) + 1);
-
-
-          const statusCell = document.createElement("div");
-          if (isActive) {
-            statusCell.appendChild(createActiveBadge());
-          } else {
-            statusCell.appendChild(createNextLabel(position));
-          }
-
-          const titleWrap = document.createElement("div");
-          titleWrap.className = "title-cell";
-          titleWrap.textContent = item.title || "—";
-
-          
-
-          addRow(
-            "currentFeedTable",
-            [position, statusCell, item.item_id || "", titleWrap],
-            false,
-            isActive ? "active-row" : null
-          );
-        });
-      } else {
-        setEmptyState("currentFeedEmpty", true);
-      }
     }
 
     function renderCurrentUser(data) {
       clearAllTables();
-
-      setEmptyState("currentUserEmpty", false);
-      setEmptyState("likedEmpty", false);
-      setEmptyState("skippedEmpty", false);
       setEmptyState("historyEmpty", false);
-      setEmptyState("currentFeedEmpty", false);
 
       if (!data.active_user) {
         resetSummary();
         resetFortunePreview();
-        setEmptyState("currentUserEmpty", true);
-        setEmptyState("likedEmpty", true);
-        setEmptyState("skippedEmpty", true);
         setEmptyState("historyEmpty", true);
-        setEmptyState("currentFeedEmpty", true);
         setStatus("No active user right now.", "loading");
         return;
       }
 
       setSummary(data);
       setFortunePreview(data);
-
-      addRow("currentUserTable", [
-        data.active_user,
-        String(data.has_vector),
-        data.total_seen,
-        data.liked_count,
-        data.skipped_count,
-        formatTimestamp(data.last_activity_at)
-      ]);
-
-      renderCurrentFeed(data.current_feed || []);
-
-      if ((data.liked || []).length) {
-        data.liked.forEach(itemId => addRow("likedTable", [itemId], true));
-      } else {
-        setEmptyState("likedEmpty", true);
-      }
-
-      if ((data.skipped || []).length) {
-        data.skipped.forEach(itemId => addRow("skippedTable", [itemId], true));
-      } else {
-        setEmptyState("skippedEmpty", true);
-      }
 
       if ((data.history || []).length) {
         data.history.forEach((entry, index) => {
@@ -738,11 +492,7 @@
         clearAllTables();
         resetSummary();
         resetFortunePreview();
-        setEmptyState("currentUserEmpty", true);
-        setEmptyState("likedEmpty", true);
-        setEmptyState("skippedEmpty", true);
         setEmptyState("historyEmpty", true);
-        setEmptyState("currentFeedEmpty", true);
         setStatus(`Failed to load current user data: ${err.message}`, "error");
       } finally {
         refreshInFlight = false;
@@ -756,9 +506,7 @@
       }, REFRESH_MS);
     }
 
-    document.getElementById("refreshBtn").addEventListener("click", () => {
-      loadCurrentUser();
-    });
+    document.getElementById("refreshBtn").addEventListener("click", () => { loadCurrentUser(); });
 
     document.getElementById("toggleBtn").addEventListener("click", (e) => {
       pollingPaused = !pollingPaused;
