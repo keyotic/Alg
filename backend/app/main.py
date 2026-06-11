@@ -180,8 +180,10 @@ def mark_active(uid: str):
 
 
 def log_interaction(uid: str, item_id: str, action: str):
+    title = ITEMS_META.get(item_id, {}).get("title", None)
     USER_HISTORY.setdefault(uid, []).append({
         "item_id": item_id,
+        "title": title,
         "action": action,
         "ts": time.time(),
     })
