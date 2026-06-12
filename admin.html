@@ -134,7 +134,9 @@
 
     .fortune {
       flex: 1 1 auto;          /* take remaining space */
-      padding-left: 60px;      /* push further right — adjust to taste */
+      padding-left: 200px;      /* push further right — adjust to taste */
+      font-family: mr-eaves-xl-modern, sans-serif;
+      font-size: 24pt;
     }
 
     .legend img {
@@ -147,8 +149,10 @@
     .fortune blockquote {
       margin: 0;
       font-style: italic;
-      font-size: 16px;
+      font-size: 24pt;
       max-width: 360px;
+      font-family: mr-eaves-xl-modern, sans-serif;
+      margin-top: 25px;
     }
 
     /* Footer: meta info + toolbar */
@@ -295,9 +299,8 @@
           <img src="assets/img/legend-data.jpg" alt="Legend">
         </div>
         <div class="fortune">
-          <h2>Fortune Preview</h2>
           <div class="fortune-box">
-            <blockquote id="fortunePreviewText">No active user right now.</blockquote>
+            <blockquote id="fortunePreviewText">Fortune Loading...</blockquote>
           </div>
         </div>
       </div>
