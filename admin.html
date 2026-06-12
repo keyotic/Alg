@@ -1,4 +1,4 @@
-content = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -123,15 +123,25 @@ content = """<!DOCTYPE html>
       flex-shrink: 0;
       display: flex;
       align-items: flex-start;
-      gap: 40px;
+      gap: 0;                  /* remove gap, control spacing manually */
       padding: 16px 0 0 0;
-      min-height: 80px;
+      min-height: 245px;       /* match legend height */
+    }
+
+    .legend {
+      flex: 0 0 667px;         /* lock legend to exact width */
+    }
+
+    .fortune {
+      flex: 1 1 auto;          /* take remaining space */
+      padding-left: 60px;      /* push further right — adjust to taste */
     }
 
     .legend img {
       display: block;
-      max-height: 80px;
-      width: auto;
+      width: 667px;
+      height: 245px;
+      object-fit: contain;
     }
 
     .fortune blockquote {
