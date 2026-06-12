@@ -26,7 +26,6 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
       font-family: mr-eaves-xl-modern, sans-serif;
       line-height: 1.45;
       background: black;
@@ -41,20 +40,19 @@
 
     h2, h3 { margin: 0 0 10px; }
 
-    /* ── Page wrapper: left panel + right column ── */
+    /* Page wrapper: left panel + right column side by side */
     #pageWrapper {
       display: flex;
       align-items: flex-start;
       padding: 24px;
       gap: 24px;
-      height: 100%;
     }
 
-    /* ── Left panel: fixed width, uses full height via flex column ── */
+    /* Left panel: fixed width, explicit height so footer can pin to bottom */
     #leftPanel {
       flex: 0 0 385px;
       width: 385px;
-      height: 100%;
+      height: 1175px;
       display: flex;
       flex-direction: column;
     }
@@ -62,9 +60,10 @@
     .summary {
       width: 100%;
       margin-top: 16px;
+      flex-shrink: 0;
     }
 
-    /* History section grows to fill available space, scroll internally */
+    /* History section fills remaining space, scrolls internally */
     .section {
       margin-top: 24px;
       flex: 1 1 auto;
@@ -101,7 +100,7 @@
       z-index: 1;
     }
 
-    /* Footer pinned to bottom of left panel, never scrolls */
+    /* Footer pinned to bottom of left panel */
     #footer {
       flex-shrink: 0;
       margin-top: 16px;
@@ -159,6 +158,7 @@
       font-size: 13px;
       margin-top: 10px;
       color: #aaa;
+      flex-shrink: 0;
     }
 
     .ok    { color: #0f9d58; font-weight: bold; }
@@ -183,7 +183,7 @@
     .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
     .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
 
-    /* ── Right column ── */
+    /* Right column: viz on top, bottom bar below */
     #rightColumn {
       flex: 1 1 auto;
       display: flex;
@@ -191,6 +191,7 @@
       min-width: 0;
     }
 
+    /* Visualization: hard fixed height, never squeezed */
     #feedJourneySection {
       width: 100%;
       height: 830px;
@@ -219,6 +220,7 @@
       gap: 0;
       padding: 16px 0 0 0;
       min-height: 245px;
+      margin-top: 150px;
     }
 
     .legend {
@@ -251,7 +253,7 @@
 <body>
   <div id="pageWrapper">
 
-    <!-- ── Left panel ── -->
+    <!-- Left panel -->
     <div id="leftPanel">
       <h1>Algoracle</h1>
 
@@ -278,9 +280,8 @@
         </div>
       </div>
 
-      <!-- Section grows, scroll inside — footer stays below -->
       <div class="section">
-        <h3>Interaction History</h3>
+        <h3 style="flex-shrink:0;">Interaction History</h3>
         <div class="scroll">
           <table id="historyTable">
             <thead>
@@ -296,7 +297,7 @@
         <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
       </div>
 
-      <!-- Footer: always pinned to bottom of left panel -->
+      <!-- Footer pinned to bottom of left panel -->
       <div id="footer">
         <p class="meta">Backend: <span id="apiBase"></span></p>
         <p class="meta">Refresh interval: every 2 seconds</p>
@@ -310,7 +311,7 @@
 
     </div>
 
-    <!-- ── Right column: viz → bottom bar ── -->
+    <!-- Right column: viz then bottom bar -->
     <div id="rightColumn">
 
       <div id="feedJourneySection">
