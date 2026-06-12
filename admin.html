@@ -26,7 +26,7 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      min-height: 100%;
+      height: 100%;
       font-family: mr-eaves-xl-modern, sans-serif;
       line-height: 1.45;
       background: black;
@@ -41,18 +41,22 @@
 
     h2, h3 { margin: 0 0 10px; }
 
-    /* ── Page wrapper: left panel + right column side by side ── */
+    /* ── Page wrapper: left panel + right column ── */
     #pageWrapper {
       display: flex;
       align-items: flex-start;
       padding: 24px;
       gap: 24px;
+      height: 100%;
     }
 
-    /* ── Left panel: fixed width, never grows ── */
+    /* ── Left panel: fixed width, uses full height via flex column ── */
     #leftPanel {
       flex: 0 0 385px;
       width: 385px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
     }
 
     .summary {
@@ -60,12 +64,21 @@
       margin-top: 16px;
     }
 
-    /* History table: capped height, scrolls internally */
+    /* History section grows to fill available space, scroll internally */
+    .section {
+      margin-top: 24px;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
     .scroll {
       width: 100%;
-      max-height: 650px;
+      flex: 1 1 auto;
       overflow-y: auto;
       overflow-x: hidden;
+      min-height: 0;
     }
 
     #historyTable {
@@ -88,83 +101,18 @@
       z-index: 1;
     }
 
-    /* ── Right column: viz + bottom bar + footer stacked vertically ── */
-    #rightColumn {
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      min-width: 0;
-    }
-
-    /* Visualization: fixed height, never grows */
-    #feedJourneySection {
-      width: 100%;
-      height: 830px;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-
-    #feedJourney {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    #feedJourney svg {
-      width: 100%;
-      height: 100%;
-      display: block;
-      overflow: hidden;
-    }
-
-    /* Bottom bar: legend + fortune side by side, fixed height */
-    #bottomBar {
-      flex-shrink: 0;
-      display: flex;
-      align-items: flex-start;
-      gap: 0;                  /* remove gap, control spacing manually */
-      padding: 16px 0 0 0;
-      min-height: 245px;       /* match legend height */
-    }
-
-    .legend {
-      flex: 0 0 667px;         /* lock legend to exact width */
-    }
-
-    .fortune {
-      flex: 1 1 auto;          /* take remaining space */
-      padding-left: 200px;      /* push further right — adjust to taste */
-      font-family: mr-eaves-xl-modern, sans-serif;
-      font-size: 24pt;
-    }
-
-    .legend img {
-      display: block;
-      width: 667px;
-      height: 245px;
-      object-fit: contain;
-    }
-
-    .fortune blockquote {
-      margin: 0;
-      font-style: italic;
-      font-size: 24pt;
-      max-width: 360px;
-      font-family: mr-eaves-xl-modern, sans-serif;
-      margin-top: 25px;
-    }
-
-    /* Footer: meta info + toolbar */
+    /* Footer pinned to bottom of left panel, never scrolls */
     #footer {
       flex-shrink: 0;
-      padding: 16px 0 0 0;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #222;
     }
 
     .toolbar {
-      margin-top: 12px;
+      margin-top: 8px;
       display: flex;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
       flex-wrap: wrap;
     }
@@ -174,9 +122,9 @@
       background: transparent;
       color: #fff;
       border-radius: 10px;
-      padding: 8px 14px;
+      padding: 6px 10px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 12px;
     }
 
     button:hover { background: #1a1a1a; }
@@ -184,18 +132,18 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       border: 1px solid #444;
       border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 13px;
+      padding: 4px 10px;
+      font-size: 12px;
       font-weight: bold;
       color: #aaa;
     }
 
     .dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #0f9d58;
       display: inline-block;
@@ -203,7 +151,7 @@
 
     .meta {
       color: #aaa;
-      font-size: 13px;
+      font-size: 12px;
       margin: 2px 0;
     }
 
@@ -235,7 +183,68 @@
     .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
     .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
 
-    .section { margin-top: 24px; }
+    /* ── Right column ── */
+    #rightColumn {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    #feedJourneySection {
+      width: 100%;
+      height: 830px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    #feedJourney {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #feedJourney svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: hidden;
+    }
+
+    /* Bottom bar: legend + fortune side by side */
+    #bottomBar {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      padding: 16px 0 0 0;
+      min-height: 245px;
+    }
+
+    .legend {
+      flex: 0 0 667px;
+    }
+
+    .legend img {
+      display: block;
+      width: 667px;
+      height: 245px;
+      object-fit: contain;
+    }
+
+    .fortune {
+      flex: 1 1 auto;
+      padding-left: 200px;
+    }
+
+    .fortune blockquote {
+      margin: 0;
+      font-style: italic;
+      font-size: 24pt;
+      max-width: 360px;
+      font-family: mr-eaves-xl-modern, sans-serif;
+      margin-top: 25px;
+    }
   </style>
 </head>
 
@@ -269,6 +278,7 @@
         </div>
       </div>
 
+      <!-- Section grows, scroll inside — footer stays below -->
       <div class="section">
         <h3>Interaction History</h3>
         <div class="scroll">
@@ -285,9 +295,22 @@
         </div>
         <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
       </div>
+
+      <!-- Footer: always pinned to bottom of left panel -->
+      <div id="footer">
+        <p class="meta">Backend: <span id="apiBase"></span></p>
+        <p class="meta">Refresh interval: every 2 seconds</p>
+        <p class="meta">Last refresh: <span id="lastRefresh">&mdash;</span></p>
+        <div class="toolbar">
+          <div class="badge"><span class="dot"></span> Live polling enabled</div>
+          <button id="refreshBtn">Refresh now</button>
+          <button id="toggleBtn">Pause auto-refresh</button>
+        </div>
+      </div>
+
     </div>
 
-    <!-- ── Right column: viz → bottom bar → footer ── -->
+    <!-- ── Right column: viz → bottom bar ── -->
     <div id="rightColumn">
 
       <div id="feedJourneySection">
@@ -302,17 +325,6 @@
           <div class="fortune-box">
             <blockquote id="fortunePreviewText">Fortune Loading...</blockquote>
           </div>
-        </div>
-      </div>
-
-      <div id="footer">
-        <p class="meta">Backend: <span id="apiBase"></span></p>
-        <p class="meta">Refresh interval: every 2 seconds</p>
-        <p class="meta">Last refresh: <span id="lastRefresh">&mdash;</span></p>
-        <div class="toolbar">
-          <div class="badge"><span class="dot"></span> Live polling enabled</div>
-          <button id="refreshBtn">Refresh now</button>
-          <button id="toggleBtn">Pause auto-refresh</button>
         </div>
       </div>
 
@@ -780,4 +792,3 @@
   </script>
 </body>
 </html>
-
