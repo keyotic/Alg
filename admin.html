@@ -26,7 +26,7 @@
     h1 {
       font-family: cesso;
       font-size: 42pt;
-      margin: 0;
+      text-align: center;
     }
 
     h2, h3 { margin: 0 0 10px; }
@@ -38,7 +38,7 @@
       left: 0;
       width: 450px;
       height: 100vh;
-      border-right: 1px solid #fff;
+      border-right: 4px solid #fff;
       display: flex;
       flex-direction: column;
       padding: 24px 20px;
@@ -172,8 +172,8 @@
       border: 1px solid transparent;
     }
 
-    .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
-    .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
+    .pill.like { color: #C0FD02; }
+    .pill.skip { color: #FB00FF;  }
 
     /* ── MIDDLE PANEL ──
        fixed, top-right, height = viewport minus bottom panel */
@@ -209,7 +209,7 @@
       right: 0;
       bottom: 0;
       height: var(--bottom-h);
-      border-top: 1px solid #fff;
+      border-top: 4px solid #fff;
       display: flex;
       align-items: center;
       gap: 48px;
@@ -219,6 +219,7 @@
 
     .legend {
       flex-shrink: 0;
+      padding-left: 100px;
     }
 
     .legend img {
@@ -230,6 +231,7 @@
 
     .fortune {
       flex: 1 1 auto;
+      margin-left: 200px;
     }
 
     .fortune blockquote {
