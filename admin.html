@@ -82,12 +82,12 @@
     #historyTable td {
       padding: 8px 10px;
       font-size: 13px;
-      border-bottom: 1px solid #222;
-      color: white;
+      color: rgb(255, 255, 255);
+      font-weight: bold;
     }
 
     #historyTable th {
-      background: #111;
+      background: #000000;
       position: sticky;
       top: 0;
       z-index: 1;
@@ -136,7 +136,7 @@
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #0f9d58;
+      background: #C0FD02;
       display: inline-block;
     }
 
@@ -147,14 +147,14 @@
     }
 
     .status {
-      font-size: 13px;
-      margin-top: 10px;
-      color: #aaa;
+      font-size: 10px;
+      margin-top: -10px;
+      color: #ffffff;
       flex-shrink: 0;
     }
 
-    .ok    { color: #0f9d58; font-weight: bold; }
-    .error { color: #c62828; font-weight: bold; }
+    .ok    { color: #C0FD02; font-weight: bold; }
+    .error { color: #FB00FF; font-weight: bold; }
 
     .empty {
       color: #555;
@@ -256,18 +256,18 @@
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
 
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
-          <span style="color:#aaa;font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Active user</span>
-          <span id="summaryUser" style="font-size:16px;font-weight:bold;">&mdash;</span>
+          <span style="color:#ffffff;font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Active user</span>
+          <span id="summaryUser" style="font-size:16px;font-weight:bold; text-align: right;">&mdash;</span>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
-          <span style="color:#aaa;font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Likes</span>
-          <span id="summaryLikes" style="font-size:16px;font-weight:bold;">0</span>
+          <span style="color:#ffffff;font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Likes</span>
+          <span id="summaryLikes" style="font-size:16px;font-weight:bold; text-align: right;">0</span>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
-          <span style="color:#aaa;font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Skips</span>
-          <span id="summarySkips" style="font-size:16px;font-weight:bold;">0</span>
+          <span style="color:#ffffff; font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Skips</span>
+          <span id="summarySkips" style="font-size:16px;font-weight:bold; text-align: right;">0</span>
         </div>
 
       </div>
