@@ -26,10 +26,12 @@
       margin: 0;
       padding: 0;
       width: 100%;
+      height: 100%;
       font-family: mr-eaves-xl-modern, sans-serif;
       line-height: 1.45;
       background: black;
       color: white;
+      position: relative;
     }
 
     h1 {
@@ -40,44 +42,23 @@
 
     h2, h3 { margin: 0 0 10px; }
 
-    /* Page wrapper: left panel + right column side by side */
-    #pageWrapper {
-      display: flex;
-      align-items: flex-start;
-      padding: 24px;
-      gap: 24px;
-    }
-
-    /* Left panel: fixed width, explicit height so footer can pin to bottom */
     #leftPanel {
-      flex: 0 0 385px;
+      position: absolute;
+      top: 24px;
+      left: 24px;
       width: 385px;
-      height: 1175px;
-      display: flex;
-      flex-direction: column;
     }
 
     .summary {
-      width: 100%;
+      width: 385px;
       margin-top: 16px;
-      flex-shrink: 0;
-    }
-
-    /* History section fills remaining space, scrolls internally */
-    .section {
-      margin-top: 24px;
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
     }
 
     .scroll {
-      width: 100%;
-      flex: 1 1 auto;
+      width: 385px;
+      max-height: 650px;
       overflow-y: auto;
       overflow-x: hidden;
-      min-height: 0;
     }
 
     #historyTable {
@@ -100,18 +81,58 @@
       z-index: 1;
     }
 
-    /* Footer pinned to bottom of left panel */
+    #layoutCanvas {
+      position: absolute;
+      top: 24px;
+      left: 430px;
+      width: calc(100vw - 454px);
+      height: 900px;
+    }
+
+    #feedJourneySection {
+      position: absolute;
+      top: 0;
+      left: 80px;
+      width: 1600px;
+      height: 830px;
+      overflow: hidden;
+    }
+
+    #feedJourney {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #feedJourney svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: hidden;
+    }
+
+    .legend {
+      position: absolute;
+      top: 685px;
+      left: 80px;
+    }
+
+    .fortune {
+      position: absolute;
+      top: 685px;
+      left: 870px;
+    }
+
     #footer {
-      flex-shrink: 0;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px solid #222;
+      position: absolute;
+      top: 960px;
+      left: 24px;
     }
 
     .toolbar {
-      margin-top: 8px;
+      margin-top: 12px;
       display: flex;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
       flex-wrap: wrap;
     }
@@ -121,9 +142,9 @@
       background: transparent;
       color: #fff;
       border-radius: 10px;
-      padding: 6px 10px;
+      padding: 8px 14px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 14px;
     }
 
     button:hover { background: #1a1a1a; }
@@ -131,18 +152,18 @@
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       border: 1px solid #444;
       border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 12px;
+      padding: 6px 12px;
+      font-size: 13px;
       font-weight: bold;
       color: #aaa;
     }
 
     .dot {
-      width: 7px;
-      height: 7px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: #0f9d58;
       display: inline-block;
@@ -150,7 +171,7 @@
 
     .meta {
       color: #aaa;
-      font-size: 12px;
+      font-size: 13px;
       margin: 2px 0;
     }
 
@@ -158,7 +179,6 @@
       font-size: 13px;
       margin-top: 10px;
       color: #aaa;
-      flex-shrink: 0;
     }
 
     .ok    { color: #0f9d58; font-weight: bold; }
@@ -183,154 +203,88 @@
     .pill.like { color: #0b6b3a; background: #e8f7ef; border-color: #bfe8cf; }
     .pill.skip { color: #8a5a10; background: #fff4df; border-color: #efd39c; }
 
-    /* Right column: viz on top, bottom bar below */
-    #rightColumn {
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-
-    /* Visualization: hard fixed height, never squeezed */
-    #feedJourneySection {
-      width: 100%;
-      height: 830px;
-      flex-shrink: 0;
-      overflow: hidden;
-    }
-
-    #feedJourney {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    #feedJourney svg {
-      width: 100%;
-      height: 100%;
-      display: block;
-      overflow: hidden;
-    }
-
-    /* Bottom bar: legend + fortune side by side */
-    #bottomBar {
-      flex-shrink: 0;
-      display: flex;
-      align-items: flex-start;
-      gap: 0;
-      padding: 16px 0 0 0;
-      min-height: 245px;
-      margin-top: 150px;
-    }
-
-    .legend {
-      flex: 0 0 667px;
-    }
-
-    .legend img {
-      display: block;
-      width: 667px;
-      height: 245px;
-      object-fit: contain;
-    }
-
-    .fortune {
-      flex: 1 1 auto;
-      padding-left: 200px;
-    }
-
-    .fortune blockquote {
-      margin: 0;
-      font-style: italic;
-      font-size: 24pt;
-      max-width: 360px;
-      font-family: mr-eaves-xl-modern, sans-serif;
-      margin-top: 25px;
-    }
+    .section { margin-top: 24px; }
   </style>
 </head>
 
 <body>
-  <div id="pageWrapper">
 
-    <!-- Left panel -->
-    <div id="leftPanel">
-      <h1>Algoracle</h1>
+  <!-- Left panel -->
+  <div id="leftPanel">
+    <h1>Algoracle</h1>
 
-      <div id="currentUserStatus" class="status">Loading current active user...</div>
+    <div id="currentUserStatus" class="status">Loading current active user...</div>
 
-      <div class="summary">
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+    <div class="summary">
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
 
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Active user</span>
-            <span id="summaryUser" style="font-size: 16px; font-weight: bold;">&mdash;</span>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Likes</span>
-            <span id="summaryLikes" style="font-size: 16px; font-weight: bold;">0</span>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Skips</span>
-            <span id="summarySkips" style="font-size: 16px; font-weight: bold;">0</span>
-          </div>
-
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Active user</span>
+          <span id="summaryUser" style="font-size: 16px; font-weight: bold;">&mdash;</span>
         </div>
-      </div>
 
-      <div class="section">
-        <h3 style="flex-shrink:0;">Interaction History</h3>
-        <div class="scroll">
-          <table id="historyTable">
-            <thead>
-              <tr>
-                <th style="text-align: left;">Item ID</th>
-                <th style="text-align: center;">Title</th>
-                <th style="text-align: right;">Action</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Likes</span>
+          <span id="summaryLikes" style="font-size: 16px; font-weight: bold;">0</span>
         </div>
-        <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
-      </div>
 
-      <!-- Footer pinned to bottom of left panel -->
-      <div id="footer">
-        <p class="meta">Backend: <span id="apiBase"></span></p>
-        <p class="meta">Refresh interval: every 2 seconds</p>
-        <p class="meta">Last refresh: <span id="lastRefresh">&mdash;</span></p>
-        <div class="toolbar">
-          <div class="badge"><span class="dot"></span> Live polling enabled</div>
-          <button id="refreshBtn">Refresh now</button>
-          <button id="toggleBtn">Pause auto-refresh</button>
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Skips</span>
+          <span id="summarySkips" style="font-size: 16px; font-weight: bold;">0</span>
         </div>
-      </div>
 
+      </div>
     </div>
 
-    <!-- Right column: viz then bottom bar -->
-    <div id="rightColumn">
-
-      <div id="feedJourneySection">
-        <div id="feedJourney"></div>
+    <div class="section">
+      <h3>Interaction History</h3>
+      <div class="scroll">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th style="text-align: left;">Item ID</th>
+              <th style="text-align: center;">Title</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
+      <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
+    </div>
+  </div>
 
-      <div id="bottomBar">
-        <div class="legend">
-          <img src="assets/img/legend-data.jpg" alt="Legend">
-        </div>
-        <div class="fortune">
-          <div class="fortune-box">
-            <blockquote id="fortunePreviewText">Fortune Loading...</blockquote>
-          </div>
-        </div>
-      </div>
+  <!-- Layout canvas -->
+  <div id="layoutCanvas">
 
+    <div id="feedJourneySection">
+      <div id="feedJourney"></div>
     </div>
 
+    <div class="legend">
+      <img src="assets/img/legend-data.jpg">
+    </div>
+
+    <div class="fortune">
+      <h2>Fortune Preview</h2>
+      <div class="fortune-box">
+        <blockquote id="fortunePreviewText" style="margin:0; font-style:italic; font-size:18px; max-width:360px;">No active user right now.</blockquote>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <p class="meta">Backend: <span id="apiBase"></span></p>
+    <p class="meta">Refresh interval: every 2 seconds</p>
+    <p class="meta">Last refresh: <span id="lastRefresh">&mdash;</span></p>
+
+    <div class="toolbar">
+      <div class="badge"><span class="dot"></span> Live polling enabled</div>
+      <button id="refreshBtn">Refresh now</button>
+      <button id="toggleBtn">Pause auto-refresh</button>
+    </div>
   </div>
 
   <script>
@@ -381,7 +335,7 @@
     }
 
     function setSummary(data) {
-      document.getElementById("summaryUser").textContent = data?.active_user || "\\u2014";
+      document.getElementById("summaryUser").textContent = data?.active_user || "—";
       document.getElementById("summaryLikes").textContent = data?.liked_count ?? 0;
       document.getElementById("summarySkips").textContent = data?.skipped_count ?? 0;
     }
@@ -446,7 +400,7 @@
           const actionPill = document.createElement("span");
           actionPill.className = `pill ${entry.action === "like" ? "like" : "skip"}`;
           actionPill.textContent = entry.action;
-          addRow("historyTable", [entry.item_id, entry.title || "\\u2014", actionPill], false, ["left", "center", "right"]);
+          addRow("historyTable", [entry.item_id, entry.title || "—", actionPill], false, ["left", "center", "right"]);
         });
       } else {
         setEmptyState("historyEmpty", true);
@@ -456,13 +410,13 @@
     }
 
     function parseCSV(text) {
-      const lines = text.trim().split(/\\r?\\n/);
+      const lines = text.trim().split(/\r?\n/);
       if (!lines.length) return [];
 
       const headers = lines[0].split(",").map(h => h.trim());
 
       return lines.slice(1).map(line => {
-        const values = line.match(/(".*?"|[^",]+)(?=\\s*,|\\s*$)/g) || [];
+        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
         const row = {};
 
         headers.forEach((header, i) => {
@@ -476,7 +430,7 @@
     }
 
     function getNumericId(itemId) {
-      const match = String(itemId ?? "").match(/\\d+/);
+      const match = String(itemId ?? "").match(/\d+/);
       return match ? Number(match[0]) : 0;
     }
 
