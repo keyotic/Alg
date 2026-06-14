@@ -33,7 +33,10 @@
     }
 
 
-    h2, h3 { margin: 0 0 10px; }
+    h2, h3 { 
+      margin-top: -70px;
+      font-size: 24pt;
+     }
 
 
     /* ── LEFT PANEL ── fixed, full viewport height */
@@ -249,6 +252,10 @@
     .legend {
       flex-shrink: 0;
       padding-left: 100px;
+      padding-right: 215px;
+      padding-top: 25px;
+      padding-bottom: 19px;
+      border-right: 4px solid #fff;
     }
 
 
@@ -262,7 +269,7 @@
 
     .fortune {
       flex: 1 1 auto;
-      margin-left: 200px;
+      margin-left: 100px;
     }
 
 
@@ -370,6 +377,7 @@
       <img src="assets/img/legend-data.jpg" alt="Legend">
     </div>
     <div class="fortune">
+      <h2>Current Possible Fortune</h2>
       <blockquote id="fortunePreviewText">No active user right now.</blockquote>
     </div>
   </div>
