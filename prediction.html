@@ -7,6 +7,33 @@
     <link rel="stylesheet" href="../src/index.css" />
     <link rel="stylesheet" href="https://use.typekit.net/jha8zkp.css">
     <title>Document</title>
+
+    <style>
+        /* Container for letter animation */
+        .predictiontext {
+            opacity: 1;
+        }
+
+        /* Wrap each word to preserve natural line breaks */
+        .predictiontext .word {
+            display: inline-block;
+            white-space: nowrap;
+        }
+
+        /* Individual letter style */
+        .predictiontext .letter {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(8px) scale(0.95);
+            transition: opacity 400ms ease-out, transform 400ms ease-out;
+        }
+
+        /* Animated letter - flows in */
+        .predictiontext .letter.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    </style>
 </head>
 <body>
     <header class="exitheader">
@@ -21,26 +48,32 @@
         <p class="predictiontext" id="predictionText">"Reading your future..."</p>
     </div>
 
+
     <script>
         const API =
             window.location.hostname === "localhost"
                 ? "http://localhost:8000"
                 : "https://alg-backend.onrender.com";
 
+
         const synth = window.speechSynthesis;
         const userId = sessionStorage.getItem("user_id") || "stranger";
+
 
         let voices = [];
         let hasStarted = false;
         let speechStopped = false;
         let isLeaving = false;
 
+
         function loadVoices() {
             voices = synth.getVoices();
         }
 
+
         function getPreferredVoice() {
             if (!voices.length) return null;
+
 
             return (
                 voices.find(v => v.name === "Google UK English Female") ||
@@ -54,6 +87,7 @@
             );
         }
 
+
         function stopSpeaking() {
             speechStopped = true;
             if ("speechSynthesis" in window) {
@@ -61,12 +95,15 @@
             }
         }
 
+
         function speakLines(lines, index = 0) {
             if (speechStopped) return;
             if (index >= lines.length) return;
 
+
             const utterance = new SpeechSynthesisUtterance(lines[index]);
             const selectedVoice = getPreferredVoice();
+
 
             if (selectedVoice) {
                 utterance.voice = selectedVoice;
@@ -75,61 +112,123 @@
                 utterance.lang = "en-GB";
             }
 
+
             utterance.rate = 0.78;
             utterance.pitch = 0.82;
             utterance.volume = 1;
+
 
             utterance.onend = () => {
                 if (speechStopped) return;
                 setTimeout(() => speakLines(lines, index + 1), 350);
             };
 
+
             synth.speak(utterance);
         }
+
 
         function speakPrediction() {
             if (!("speechSynthesis" in window)) return;
             if (speechStopped) return;
 
+
             synth.cancel();
 
+
             const predictionText = document.getElementById("predictionText").textContent.trim();
+
 
             const lines = [
                 predictionText
             ];
 
+
             speakLines(lines);
         }
+
+
+        // Function to animate letters flowing in with proper word wrapping
+        function animateLettersFlow(text, element) {
+            // Clear existing content
+            element.textContent = '';
+
+            // Split text into words (preserves spaces between words)
+            const words = text.split(/(\s+)/); // Split but keep spaces
+            
+            let globalIndex = 0;
+            
+            words.forEach((part) => {
+                if (part.trim() === '') {
+                    // This is a space or whitespace
+                    const spaceSpan = document.createElement('span');
+                    spaceSpan.textContent = part;
+                    element.appendChild(spaceSpan);
+                } else {
+                    // This is a word - wrap letters in it
+                    const wordSpan = document.createElement('span');
+                    wordSpan.className = 'word';
+                    
+                    const chars = part.split('');
+                    chars.forEach((char) => {
+                        const letterSpan = document.createElement('span');
+                        letterSpan.className = 'letter';
+                        letterSpan.textContent = char;
+                        wordSpan.appendChild(letterSpan);
+                        
+                        // Stagger animation within word
+                        setTimeout(() => {
+                            letterSpan.classList.add('visible');
+                        }, 30 + globalIndex * 25);
+                        
+                        globalIndex++;
+                    });
+                    
+                    element.appendChild(wordSpan);
+                }
+            });
+        }
+
 
         async function loadFortune() {
             try {
                 const res = await fetch(`${API}/fortune/${encodeURIComponent(userId)}`);
                 const data = await res.json();
 
-                document.getElementById("predictionText").textContent =
-                    data.fortune || "Your future is still taking shape.";
+
+                const textEl = document.getElementById("predictionText");
+                const fortuneText = data.fortune || "Your future is still taking shape.";
+
 
                 if (!hasStarted) {
                     hasStarted = true;
                     setTimeout(() => {
                         if (!speechStopped && !isLeaving) {
+                            // Animate letters flowing in
+                            animateLettersFlow(fortuneText, textEl);
                             speakPrediction();
                         }
                     }, 900);
                 }
             } catch (err) {
                 console.error("Failed to load fortune:", err);
-                document.getElementById("predictionText").textContent =
-                    "The future is clouded for now, but clarity will return soon.";
+                const textEl = document.getElementById("predictionText");
+                const errorText = "The future is clouded for now, but clarity will return soon.";
+                
+                setTimeout(() => {
+                    animateLettersFlow(errorText, textEl);
+                }, 900);
             }
         }
+
 
         async function goHome() {
             if (isLeaving) return;
             isLeaving = true;
 
+
             stopSpeaking();
+
 
             try {
                 await fetch(`${API}/reset`, {
@@ -143,25 +242,31 @@
                 console.error("Reset failed:", err);
             }
 
+
             sessionStorage.removeItem("user_id");
             window.location.href = "Home.html";
         }
 
+
         if ("speechSynthesis" in window) {
             loadVoices();
+
 
             if (speechSynthesis.onvoiceschanged !== undefined) {
                 speechSynthesis.onvoiceschanged = loadVoices;
             }
         }
 
+
         window.addEventListener("load", () => {
             loadFortune();
         });
 
+
         window.addEventListener("beforeunload", () => {
             stopSpeaking();
         });
+
 
         window.addEventListener("pagehide", () => {
             stopSpeaking();
