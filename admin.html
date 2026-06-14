@@ -10,7 +10,9 @@
       --bottom-h: 293px;
     }
 
+
     * { box-sizing: border-box; }
+
 
     html, body {
       margin: 0;
@@ -23,13 +25,16 @@
       color: white;
     }
 
+
     h1 {
       font-family: cesso;
       font-size: 42pt;
       text-align: center;
     }
 
+
     h2, h3 { margin: 0 0 10px; }
+
 
     /* ── LEFT PANEL ── fixed, full viewport height */
     #leftPanel {
@@ -46,11 +51,13 @@
       z-index: 10;
     }
 
+
     .summary {
       width: 100%;
       margin-top: 16px;
       flex-shrink: 0;
     }
+
 
     .section {
       margin-top: 24px;
@@ -60,10 +67,12 @@
       min-height: 0;
     }
 
+
     .section h3 {
       flex-shrink: 0;
       margin: 0 0 8px;
     }
+
 
     .scroll {
       flex: 1 1 auto;
@@ -73,10 +82,12 @@
       width: 100%;
     }
 
+
     #historyTable {
       width: 100%;
       border-collapse: collapse;
     }
+
 
     #historyTable th,
     #historyTable td {
@@ -86,12 +97,14 @@
       font-weight: bold;
     }
 
+
     #historyTable th {
       background: #000000;
       position: sticky;
       top: 0;
       z-index: 1;
     }
+
 
     #footer {
       flex-shrink: 0;
@@ -100,6 +113,7 @@
       border-top: 1px solid #333;
     }
 
+
     .toolbar {
       margin-top: 8px;
       display: flex;
@@ -107,6 +121,7 @@
       align-items: center;
       flex-wrap: wrap;
     }
+
 
     button {
       border: 1px solid #fff;
@@ -118,7 +133,9 @@
       font-size: 12px;
     }
 
+
     button:hover { background: #1a1a1a; }
+
 
     .badge {
       display: inline-flex;
@@ -132,6 +149,7 @@
       color: #aaa;
     }
 
+
     .dot {
       width: 7px;
       height: 7px;
@@ -140,11 +158,13 @@
       display: inline-block;
     }
 
+
     .meta {
       color: #aaa;
       font-size: 12px;
       margin: 2px 0;
     }
+
 
     .status {
       font-size: 10px;
@@ -153,8 +173,10 @@
       flex-shrink: 0;
     }
 
+
     .ok    { color: #C0FD02; font-weight: bold; }
     .error { color: #FB00FF; font-weight: bold; }
+
 
     .empty {
       color: #555;
@@ -162,6 +184,7 @@
       font-size: 13px;
       padding: 8px 0;
     }
+
 
     .pill {
       display: inline-block;
@@ -172,8 +195,10 @@
       border: 1px solid transparent;
     }
 
+
     .pill.like { color: #C0FD02; }
     .pill.skip { color: #FB00FF;  }
+
 
     /* ── MIDDLE PANEL ──
        fixed, top-right, height = viewport minus bottom panel */
@@ -188,11 +213,13 @@
       z-index: 5;
     }
 
+
     #feedJourney {
       width: 100%;
       height: 100%;
       overflow: hidden;
     }
+
 
     #feedJourney svg {
       width: 100%;
@@ -200,6 +227,7 @@
       display: block;
       overflow: hidden;
     }
+
 
     /* ── BOTTOM PANEL ──
        fixed, bottom-right strip */
@@ -217,10 +245,12 @@
       z-index: 10;
     }
 
+
     .legend {
       flex-shrink: 0;
       padding-left: 100px;
     }
+
 
     .legend img {
       display: block;
@@ -229,10 +259,12 @@
       object-fit: contain;
     }
 
+
     .fortune {
       flex: 1 1 auto;
       margin-left: 200px;
     }
+
 
     .fortune blockquote {
       margin: 0;
@@ -241,37 +273,59 @@
       max-width: 600px;
       font-family: mr-eaves-xl-modern, sans-serif;
     }
+
+    /* Typewriter cursor */
+    .typewriter::after {
+      content: '▋';
+      display: inline-block;
+      margin-left: 2px;
+      color: #C0FD02;
+      animation: blink 1s step-start infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
   </style>
 </head>
 
+
 <body>
+
 
   <!-- ── LEFT PANEL ── -->
   <div id="leftPanel">
     <h1>Algoracle</h1>
 
+
     <div id="currentUserStatus" class="status">Loading current active user...</div>
+
 
     <div class="summary">
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+
 
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
           <span style="color:#ffffff;font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Active user</span>
           <span id="summaryUser" style="font-size:16px;font-weight:bold; text-align: right;">&mdash;</span>
         </div>
 
+
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
           <span style="color:#ffffff;font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Likes</span>
           <span id="summaryLikes" style="font-size:16px;font-weight:bold; text-align: right;">0</span>
         </div>
+
 
         <div style="display:flex;justify-content:space-between;align-items:baseline;">
           <span style="color:#ffffff; font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Skips</span>
           <span id="summarySkips" style="font-size:16px;font-weight:bold; text-align: right;">0</span>
         </div>
 
+
       </div>
     </div>
+
 
     <div class="section">
       <h3>Interaction History</h3>
@@ -290,6 +344,7 @@
       <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
     </div>
 
+
     <div id="footer">
       <p class="meta">Backend: <span id="apiBase"></span></p>
       <p class="meta">Refresh interval: every 2 seconds</p>
@@ -302,10 +357,12 @@
     </div>
   </div>
 
+
   <!-- ── MIDDLE PANEL: data visualization ── -->
   <div id="feedJourneySection">
     <div id="feedJourney"></div>
   </div>
+
 
   <!-- ── BOTTOM PANEL: legend + fortune ── -->
   <div id="bottomPanel">
@@ -317,16 +374,26 @@
     </div>
   </div>
 
+
   <script>
     const API = "https://alg-backend.onrender.com";
     const FEED_CSV_URL = `${API}/admin/feed.csv`;
     const REFRESH_MS = 2000;
 
+
     document.getElementById("apiBase").textContent = API;
+
 
     let pollingPaused = false;
     let refreshInFlight = false;
     let pollTimer = null;
+
+
+    // Typewriter effect state
+    let typewriterInterval = null;
+    let previousFortuneText = '';
+    let isTyping = false;
+
 
     function setStatus(message, mode = "loading") {
       const el = document.getElementById("currentUserStatus");
@@ -336,9 +403,11 @@
       else el.className = "status";
     }
 
+
     function clearTableBody(tableId) {
       document.querySelector(`#${tableId} tbody`).innerHTML = "";
     }
+
 
     function addRow(tableId, cells, renderAsCode = false, alignments = []) {
       const tbody = document.querySelector(`#${tableId} tbody`);
@@ -360,9 +429,11 @@
       tbody.appendChild(tr);
     }
 
+
     function setEmptyState(id, visible) {
       document.getElementById(id).style.display = visible ? "block" : "none";
     }
+
 
     function setSummary(data) {
       document.getElementById("summaryUser").textContent = data?.active_user || "\u2014";
@@ -370,23 +441,83 @@
       document.getElementById("summarySkips").textContent = data?.skipped_count ?? 0;
     }
 
+
     function resetSummary() {
       setSummary({ active_user: null, liked_count: 0, skipped_count: 0 });
     }
 
+
+    // Typewriter effect function - only animates when text actually changes
+    function typewriterEffect(element, newText) {
+      // Don't start new animation if already typing the same text
+      if (isTyping && previousFortuneText === newText) {
+        return;
+      }
+
+
+      // Stop any existing typewriter
+      if (typewriterInterval) {
+        clearInterval(typewriterInterval);
+        typewriterInterval = null;
+      }
+
+
+      // Remove typewriter class if it exists
+      element.classList.remove('typewriter');
+
+
+      // Only animate if text actually changed from previous
+      if (previousFortuneText === newText) {
+        isTyping = false;
+        return;
+      }
+
+
+      // Update previous text
+      previousFortuneText = newText;
+      isTyping = true;
+      let index = 0;
+
+
+      // Clear text and start typing
+      element.textContent = '';
+      element.classList.add('typewriter');
+
+
+      typewriterInterval = setInterval(() => {
+        if (index < newText.length) {
+          element.textContent = newText.substring(0, index + 1);
+          index++;
+        } else {
+          // Done typing
+          clearInterval(typewriterInterval);
+          typewriterInterval = null;
+          isTyping = false;
+          element.classList.remove('typewriter');
+        }
+      }, 30); // 30ms per character
+    }
+
+
     function setFortunePreview(data) {
       const hasUser = Boolean(data?.active_user);
-      document.getElementById("fortunePreviewText").textContent =
-        hasUser ? (data?.fortune_preview || "No preview fortune available.") : "No active user right now.";
+      const newText = hasUser ? (data?.fortune_preview || "No preview fortune available.") : "No active user right now.";
+
+
+      const element = document.getElementById("fortunePreviewText");
+      typewriterEffect(element, newText);
     }
+
 
     function resetFortunePreview() {
       setFortunePreview({ active_user: null, fortune_preview: null });
     }
 
+
     function updateLastRefresh() {
       document.getElementById("lastRefresh").textContent = new Date().toLocaleTimeString();
     }
+
 
     async function fetchJson(url) {
       const res = await fetch(url, { cache: "no-store" });
@@ -394,6 +525,7 @@
       const contentType = res.headers.get("content-type") || "";
       if (contentType.includes("application/json")) body = await res.json();
       else body = await res.text();
+
 
       if (!res.ok) {
         const detail =
@@ -403,16 +535,20 @@
         throw new Error(`HTTP ${res.status}: ${detail}`);
       }
 
+
       return body;
     }
+
 
     function clearAllTables() {
       clearTableBody("historyTable");
     }
 
+
     function renderCurrentUser(data) {
       clearAllTables();
       setEmptyState("historyEmpty", false);
+
 
       if (!data.active_user) {
         resetSummary();
@@ -422,8 +558,10 @@
         return;
       }
 
+
       setSummary(data);
       setFortunePreview(data);
+
 
       if ((data.history || []).length) {
         data.history.forEach((entry) => {
@@ -436,18 +574,23 @@
         setEmptyState("historyEmpty", true);
       }
 
+
       setStatus(`Showing live data for ${data.active_user}.`, "ok");
     }
+
 
     function parseCSV(text) {
       const lines = text.trim().split(/\r?\n/);
       if (!lines.length) return [];
 
+
       const headers = lines[0].split(",").map(h => h.trim());
+
 
       return lines.slice(1).map(line => {
         const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
         const row = {};
+
 
         headers.forEach((header, i) => {
           let value = values[i] ?? "";
@@ -455,23 +598,28 @@
           row[header] = value;
         });
 
+
         return row;
       });
     }
+
 
     function getNumericId(itemId) {
       const match = String(itemId ?? "").match(/\d+/);
       return match ? Number(match[0]) : 0;
     }
 
+
     function seededNoise(n) {
       const x = Math.sin(n * 999.123) * 10000;
       return x - Math.floor(x);
     }
 
+
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
     }
+
 
     function addDashedLine(lines, x1, y1, x2, y2, status) {
       const dashLength = 14;
@@ -481,13 +629,16 @@
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (distance === 0) return;
 
+
       const ux = dx / distance;
       const uy = dy / distance;
       let current = 0;
 
+
       while (current < distance) {
         const start = current;
         const end = Math.min(current + dashLength, distance);
+
 
         lines.push({
           x1: x1 + ux * start,
@@ -498,17 +649,21 @@
           lineType: "pending",
         });
 
+
         current += dashLength + gapLength;
       }
     }
+
 
     function radiusFromSize(size) {
       return Math.sqrt(size / Math.PI) * 0.75;
     }
 
+
     function labelSizeFromVisualSize(size, maxSize = 28) {
       return Math.max(11, Math.min(maxSize, Math.sqrt(size) / 3.6));
     }
+
 
     function resolveCollisions(nodes, margin, width, height) {
       for (let step = 0; step < 90; step++) {
@@ -517,12 +672,15 @@
             const a = nodes[i];
             const b = nodes[j];
 
+
             const ar = radiusFromSize(a.visualSize || 1600) + margin;
             const br = radiusFromSize(b.visualSize || 1600) + margin;
+
 
             let dx = b.x - a.x;
             let dy = b.y - a.y;
             let dist = Math.sqrt(dx * dx + dy * dy);
+
 
             if (dist === 0) {
               dx = seededNoise(i + 1) - 0.5;
@@ -530,12 +688,15 @@
               dist = Math.sqrt(dx * dx + dy * dy);
             }
 
+
             const minDist = ar + br;
+
 
             if (dist < minDist) {
               const push = (minDist - dist) / 2;
               const ux = dx / dist;
               const uy = dy / dist;
+
 
               a.x -= ux * push;
               a.y -= uy * push;
@@ -545,6 +706,7 @@
           }
         }
 
+
         nodes.forEach((d) => {
           const r = radiusFromSize(d.visualSize || 1600) + 24;
           d.x = clamp(d.x, r, width - r);
@@ -552,6 +714,7 @@
         });
       }
     }
+
 
     function buildFeedNodes(rows) {
       return rows.map(row => {
@@ -566,53 +729,68 @@
       });
     }
 
+
     function renderFeedJourneyFromRows(rows) {
       const container = document.getElementById("feedJourney");
       const width = 1600;
       const height = 900;
 
+
       const nodes = buildFeedNodes(rows);
+
 
       const interacted = nodes
         .filter(d => d.status === "liked" || d.status === "skipped")
         .sort((a, b) => a.position - b.position);
 
+
       const activeNode = nodes.find(d => d.status === "active");
+
 
       const pending = nodes
         .filter(d => d.status === "pending")
         .sort((a, b) => a.position - b.position);
 
+
       const pathNodes = [...interacted];
       if (activeNode) pathNodes.push(activeNode);
 
+
       const lines = [];
       const rings = [];
+
 
       const startX = 170;
       const endX = 1120;
       const centerY = 440;
 
+
       const count = Math.max(pathNodes.length, 1);
       const spacing = count > 1 ? (endX - startX) / (count - 1) : 0;
+
 
       pathNodes.forEach((d, i) => {
         const id = Number(d.id);
 
+
         const scatterX =
           Math.sin(id * 0.37 + i * 0.8) * 35 +
           (seededNoise(id + 10) - 0.5) * 30;
+
 
         const scatterY =
           Math.sin(id * 0.29 + i * 1.15) * 80 +
           Math.cos(id * 0.17 + i * 0.7) * 45 +
           (seededNoise(id + 20) - 0.5) * 40;
 
+
         d.x = startX + i * spacing + scatterX;
         d.y = centerY + scatterY;
 
+
         d.x = clamp(d.x, 110, 1250);
         d.y = clamp(d.y, 115, 785);
+
 
         d.visualSize =
           d.status === "active"
@@ -621,12 +799,15 @@
               ? 5000 + seededNoise(id + 12) * 650
               : 1500 + seededNoise(id + 18) * 350;
 
+
         if (Number(d.position) === 20) {
           d.visualSize = 7600;
         }
 
+
         d.labelSize = labelSizeFromVisualSize(d.visualSize, 28);
       });
+
 
       if (activeNode) {
         const fan = [
@@ -642,32 +823,41 @@
           { x: 150, y: -320 },
         ];
 
+
         pending.forEach((d, i) => {
           const id = Number(d.id);
           const p = fan[i % fan.length];
 
+
           d.x = activeNode.x + p.x + (seededNoise(id + 10) - 0.5) * 45;
           d.y = activeNode.y + p.y + (seededNoise(id + 20) - 0.5) * 45;
+
 
           d.x = clamp(d.x, 90, 1510);
           d.y = clamp(d.y, 80, 820);
 
+
           d.visualSize = 1150 + seededNoise(id + 77) * 850;
+
 
           if (Number(d.position) > 20) {
             d.visualSize *= 0.65;
           }
 
+
           d.labelSize = labelSizeFromVisualSize(d.visualSize, 22);
         });
       }
 
+
       resolveCollisions(nodes, 22, width, height);
+
 
       pathNodes.forEach((d, i) => {
         if (d.status === "active") {
           rings.push({ x: d.x, y: d.y, size: d.visualSize * 1.65 });
         }
+
 
         if (i > 0) {
           const prev = pathNodes[i - 1];
@@ -680,14 +870,17 @@
         }
       });
 
+
       if (activeNode) {
         pending.forEach((d) => {
           addDashedLine(lines, activeNode.x, activeNode.y, d.x, d.y, "pending");
         });
       }
 
+
       const svgParts = [];
       svgParts.push(`<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Feed Journey Visualization">`);
+
 
       lines.forEach(line => {
         const color = line.status === "liked" ? "#B6FF00" : line.status === "skipped" ? "#FF00FF" : "#FFFFFF";
@@ -696,10 +889,12 @@
         svgParts.push(`<line x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${color}" stroke-width="${strokeWidth}" opacity="${opacity}" stroke-linecap="round"/>`);
       });
 
+
       rings.forEach(ring => {
         const r = radiusFromSize(ring.size);
         svgParts.push(`<circle cx="${ring.x}" cy="${ring.y}" r="${r}" fill="none" stroke="#FFFFFF" stroke-width="2" opacity="0.36"/>`);
       });
+
 
       nodes.forEach(d => {
         const r = radiusFromSize(d.visualSize);
@@ -709,14 +904,17 @@
         svgParts.push(`<circle cx="${d.x}" cy="${d.y}" r="${r}" fill="black" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}"/>`);
       });
 
+
       nodes.forEach(d => {
         const opacity = Number(d.position) > 20 ? 0.45 : 1;
         svgParts.push(`<text x="${d.x}" y="${d.y}" fill="#FFFFFF" opacity="${opacity}" font-size="${d.labelSize}" font-weight="bold" text-anchor="middle" dominant-baseline="middle" font-family="mr-eaves-xl-modern, sans-serif">${d.label}</text>`);
       });
 
+
       svgParts.push(`</svg>`);
       container.innerHTML = svgParts.join("");
     }
+
 
     async function loadFeedJourney() {
       try {
@@ -732,10 +930,12 @@
       }
     }
 
+
     async function loadCurrentUser() {
       if (refreshInFlight) return;
       refreshInFlight = true;
       setStatus("Loading current active user...");
+
 
       try {
         const data = await fetchJson(`${API}/admin/current-user`);
@@ -754,6 +954,7 @@
       }
     }
 
+
     function startPolling() {
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = setInterval(() => {
@@ -761,7 +962,9 @@
       }, REFRESH_MS);
     }
 
+
     document.getElementById("refreshBtn").addEventListener("click", () => { loadCurrentUser(); });
+
 
     document.getElementById("toggleBtn").addEventListener("click", (e) => {
       pollingPaused = !pollingPaused;
@@ -771,6 +974,7 @@
         pollingPaused ? "" : "ok"
       );
     });
+
 
     loadCurrentUser();
     startPolling();
