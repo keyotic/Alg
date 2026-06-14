@@ -6,25 +6,17 @@
   <title>Algoracle</title>
   <style>
     :root {
-      --bg: #f6f7fb;
-      --panel: #ffffff;
-      --border: #d9deea;
-      --text: #1d2433;
-      --muted: #5f6b85;
-      --accent: #1f6feb;
-      --accent-soft: #eaf2ff;
-      --success: #0f9d58;
-      --warn: #b7791f;
-      --error: #c62828;
-      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-      --radius: 16px;
+      --left-w: 310px;
+      --bottom-h: 293px;
     }
 
     * { box-sizing: border-box; }
 
-    body {
+    html, body {
       margin: 0;
-      padding: 24px;
+      padding: 0;
+      width: 100%;
+      height: 100%;
       font-family: mr-eaves-xl-modern, sans-serif;
       line-height: 1.45;
       background: black;
@@ -34,101 +26,250 @@
     h1 {
       font-family: cesso;
       font-size: 42pt;
-      margin-top: -5px;
-      margin-left: 64px;
+      text-align: center;
     }
 
-    .section {
-      margin-top: 28px;
+    h2, h3 { margin: 0 0 10px; }
+
+    /* ── LEFT PANEL ── fixed, full viewport height */
+    #leftPanel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 450px;
+      height: 100vh;
+      border-right: 4px solid #fff;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 20px;
+      overflow: hidden;
+      z-index: 10;
     }
 
     .summary {
-      width: 385px;
+      width: 100%;
+      margin-top: 16px;
+      flex-shrink: 0;
+    }
+
+    .section {
+      margin-top: 24px;
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .section h3 {
+      flex-shrink: 0;
+      margin: 0 0 8px;
     }
 
     .scroll {
-      width: 385px;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      width: 100%;
     }
 
     #historyTable {
-      width: 385px;
-    }
-
-    #layoutCanvas {
-      position: relative;
       width: 100%;
-      height: 900px;
+      border-collapse: collapse;
     }
 
-    #feedJourneySection {
-      position: absolute;
+    #historyTable th,
+    #historyTable td {
+      padding: 8px 10px;
+      font-size: 13px;
+      color: rgb(255, 255, 255);
+      font-weight: bold;
+    }
+
+    #historyTable th {
+      background: #000000;
+      position: sticky;
       top: 0;
-      left: 510px;
-      width: 1600px;
-      height: 530px;
-      margin-top: -500px;
+      z-index: 1;
+    }
+
+    #footer {
+      flex-shrink: 0;
+      padding-top: 12px;
+      margin-top: 16px;
+      border-top: 1px solid #333;
+    }
+
+    .toolbar {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid #fff;
+      background: transparent;
+      color: #fff;
+      border-radius: 10px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    button:hover { background: #1a1a1a; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #444;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #aaa;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #C0FD02;
+      display: inline-block;
+    }
+
+    .meta {
+      color: #aaa;
+      font-size: 12px;
+      margin: 2px 0;
+    }
+
+    .status {
+      font-size: 10px;
+      margin-top: -10px;
+      color: #ffffff;
+      flex-shrink: 0;
+    }
+
+    .ok    { color: #C0FD02; font-weight: bold; }
+    .error { color: #FB00FF; font-weight: bold; }
+
+    .empty {
+      color: #555;
+      font-style: italic;
+      font-size: 13px;
+      padding: 8px 0;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: bold;
+      border: 1px solid transparent;
+    }
+
+    .pill.like { color: #C0FD02; }
+    .pill.skip { color: #FB00FF;  }
+
+    /* ── MIDDLE PANEL ──
+       fixed, top-right, height = viewport minus bottom panel */
+    #feedJourneySection {
+      position: fixed;
+      top: 0;
+      left: 450px;
+      right: 0;
+      /* explicit pixel height via calc so height:100% on children resolves */
+      height: calc(100vh - var(--bottom-h));
+      overflow: hidden;
+      z-index: 5;
     }
 
     #feedJourney {
       width: 100%;
       height: 100%;
-      overflow: visible;
+      overflow: hidden;
     }
 
     #feedJourney svg {
       width: 100%;
-      height: auto;
+      height: 100%;
       display: block;
-      overflow: visible;
+      overflow: hidden;
+    }
+
+    /* ── BOTTOM PANEL ──
+       fixed, bottom-right strip */
+    #bottomPanel {
+      position: fixed;
+      left: 450px;
+      right: 0;
+      bottom: 0;
+      height: var(--bottom-h);
+      border-top: 4px solid #fff;
+      display: flex;
+      align-items: center;
+      gap: 48px;
+      padding: 0 32px;
+      z-index: 10;
     }
 
     .legend {
-      position: absolute;
-      top: 685px;
-      left: 400px;
+      flex-shrink: 0;
+      padding-left: 100px;
+    }
+
+    .legend img {
+      display: block;
+      width: 667px;
+      height: 245px;
+      object-fit: contain;
     }
 
     .fortune {
-      position: absolute;
-      top: 755px;
-      left: 1200px;
+      flex: 1 1 auto;
+      margin-left: 200px;
     }
 
-    .meta {
-      color: #aaa;
-      font-size: 14px;
+    .fortune blockquote {
+      margin: 0;
+      font-style: italic;
+      font-size: 24pt;
+      max-width: 600px;
+      font-family: mr-eaves-xl-modern, sans-serif;
     }
   </style>
 </head>
 
 <body>
-  <div>
-    <div>
-      <div>
-        <h1>Algoracle</h1>
-      </div>
 
-      <div id="currentUserStatus" class="status loading">Loading current active user...</div>
+  <!-- ── LEFT PANEL ── -->
+  <div id="leftPanel">
+    <h1>Algoracle</h1>
 
-      <div class="summary">
-        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+    <div id="currentUserStatus" class="status">Loading current active user...</div>
 
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Active user</span>
-            <span id="summaryUser" style="font-size: 16px; font-weight: bold;">&mdash;</span>
-          </div>
+    <div class="summary">
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
 
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Likes</span>
-            <span id="summaryLikes" style="font-size: 16px; font-weight: bold;">0</span>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <span style="color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;">Skips</span>
-            <span id="summarySkips" style="font-size: 16px; font-weight: bold;">0</span>
-          </div>
-
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="color:#ffffff;font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Active user</span>
+          <span id="summaryUser" style="font-size:16px;font-weight:bold; text-align: right;">&mdash;</span>
         </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="color:#ffffff;font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Likes</span>
+          <span id="summaryLikes" style="font-size:16px;font-weight:bold; text-align: right;">0</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:baseline;">
+          <span style="color:#ffffff; font-weight: bold; font-size:14px;text-transform:uppercase;letter-spacing:0.06em;">Skips</span>
+          <span id="summarySkips" style="font-size:16px;font-weight:bold; text-align: right;">0</span>
+        </div>
+
       </div>
     </div>
 
@@ -138,9 +279,9 @@
         <table id="historyTable">
           <thead>
             <tr>
-              <th style="text-align: left;">Item ID</th>
-              <th style="text-align: center;">Title</th>
-              <th style="text-align: right;">Action</th>
+              <th style="text-align:left;">Item ID</th>
+              <th style="text-align:center;">Title</th>
+              <th style="text-align:right;">Action</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -149,36 +290,31 @@
       <div id="historyEmpty" class="empty" style="display:none;">No interaction history recorded yet.</div>
     </div>
 
-    <div id="layoutCanvas">
-
-      <div id="feedJourneySection" class="section">
-        <div id="feedJourney"></div>
+    <div id="footer">
+      <p class="meta">Backend: <span id="apiBase"></span></p>
+      <p class="meta">Refresh interval: every 2 seconds</p>
+      <p class="meta">Last refresh: <span id="lastRefresh">&mdash;</span></p>
+      <div class="toolbar">
+        <div class="badge"><span class="dot"></span> Live polling enabled</div>
+        <button id="refreshBtn">Refresh now</button>
+        <button id="toggleBtn">Pause auto-refresh</button>
       </div>
-
-      <div class="legend">
-        <img src="assets/img/legend-data.jpg">
-      </div>
-
-      <div class="fortune">
-        <h2>Fortune Preview</h2>
-        <div class="fortune-box">
-          <blockquote id="fortunePreviewText">No active user right now.</blockquote>
-        </div>
-      </div>
-
     </div>
   </div>
 
-  <div>
-    <p class="meta">Backend: <span id="apiBase"></span></p>
-    <p class="meta">Refresh interval: every 2 seconds</p>
-    <p class="meta">Last refresh: <span id="lastRefresh">&mdash;</span></p>
+  <!-- ── MIDDLE PANEL: data visualization ── -->
+  <div id="feedJourneySection">
+    <div id="feedJourney"></div>
   </div>
 
-  <div class="toolbar">
-    <div class="badge"><span class="dot"></span> Live polling enabled</div>
-    <button id="refreshBtn">Refresh now</button>
-    <button id="toggleBtn" class="secondary">Pause auto-refresh</button>
+  <!-- ── BOTTOM PANEL: legend + fortune ── -->
+  <div id="bottomPanel">
+    <div class="legend">
+      <img src="assets/img/legend-data.jpg" alt="Legend">
+    </div>
+    <div class="fortune">
+      <blockquote id="fortunePreviewText">No active user right now.</blockquote>
+    </div>
   </div>
 
   <script>
@@ -197,7 +333,7 @@
       el.textContent = message || "";
       if (mode === "error") el.className = "status error";
       else if (mode === "ok") el.className = "status ok";
-      else el.className = "status loading";
+      else el.className = "status";
     }
 
     function clearTableBody(tableId) {
@@ -229,7 +365,7 @@
     }
 
     function setSummary(data) {
-      document.getElementById("summaryUser").textContent = data?.active_user || "—";
+      document.getElementById("summaryUser").textContent = data?.active_user || "\u2014";
       document.getElementById("summaryLikes").textContent = data?.liked_count ?? 0;
       document.getElementById("summarySkips").textContent = data?.skipped_count ?? 0;
     }
@@ -282,7 +418,7 @@
         resetSummary();
         resetFortunePreview();
         setEmptyState("historyEmpty", true);
-        setStatus("No active user right now.", "loading");
+        setStatus("No active user right now.");
         return;
       }
 
@@ -294,7 +430,7 @@
           const actionPill = document.createElement("span");
           actionPill.className = `pill ${entry.action === "like" ? "like" : "skip"}`;
           actionPill.textContent = entry.action;
-          addRow("historyTable", [entry.item_id, entry.title || "—", actionPill], false, ["left", "center", "right"]);
+          addRow("historyTable", [entry.item_id, entry.title || "\u2014", actionPill], false, ["left", "center", "right"]);
         });
       } else {
         setEmptyState("historyEmpty", true);
@@ -530,20 +666,14 @@
 
       pathNodes.forEach((d, i) => {
         if (d.status === "active") {
-          rings.push({
-            x: d.x,
-            y: d.y,
-            size: d.visualSize * 1.65,
-          });
+          rings.push({ x: d.x, y: d.y, size: d.visualSize * 1.65 });
         }
 
         if (i > 0) {
           const prev = pathNodes[i - 1];
           lines.push({
-            x1: prev.x,
-            y1: prev.y,
-            x2: d.x,
-            y2: d.y,
+            x1: prev.x, y1: prev.y,
+            x2: d.x, y2: d.y,
             status: d.status,
             lineType: "history",
           });
@@ -557,26 +687,12 @@
       }
 
       const svgParts = [];
-
       svgParts.push(`<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Feed Journey Visualization">`);
 
       lines.forEach(line => {
-        const color =
-          line.status === "liked"
-            ? "#B6FF00"
-            : line.status === "skipped"
-              ? "#FF00FF"
-              : "#FFFFFF";
-
-        const strokeWidth =
-          line.lineType === "pending"
-            ? 2
-            : line.status === "liked"
-              ? 4
-              : 3.5;
-
+        const color = line.status === "liked" ? "#B6FF00" : line.status === "skipped" ? "#FF00FF" : "#FFFFFF";
+        const strokeWidth = line.lineType === "pending" ? 2 : line.status === "liked" ? 4 : 3.5;
         const opacity = line.lineType === "pending" ? 0.35 : 0.9;
-
         svgParts.push(`<line x1="${line.x1}" y1="${line.y1}" x2="${line.x2}" y2="${line.y2}" stroke="${color}" stroke-width="${strokeWidth}" opacity="${opacity}" stroke-linecap="round"/>`);
       });
 
@@ -587,16 +703,9 @@
 
       nodes.forEach(d => {
         const r = radiusFromSize(d.visualSize);
-        const stroke =
-          d.status === "liked"
-            ? "#B6FF00"
-            : d.status === "skipped"
-              ? "#FF00FF"
-              : "#FFFFFF";
-
+        const stroke = d.status === "liked" ? "#B6FF00" : d.status === "skipped" ? "#FF00FF" : "#FFFFFF";
         const opacity = Number(d.position) > 20 ? 0.45 : d.status === "pending" ? 0.86 : 1;
         const strokeWidth = d.status === "active" ? 6 : d.status === "liked" ? 5 : 4;
-
         svgParts.push(`<circle cx="${d.x}" cy="${d.y}" r="${r}" fill="black" stroke="${stroke}" stroke-width="${strokeWidth}" opacity="${opacity}"/>`);
       });
 
@@ -659,7 +768,7 @@
       e.currentTarget.textContent = pollingPaused ? "Resume auto-refresh" : "Pause auto-refresh";
       setStatus(
         pollingPaused ? "Auto-refresh paused." : "Auto-refresh resumed.",
-        pollingPaused ? "loading" : "ok"
+        pollingPaused ? "" : "ok"
       );
     });
 

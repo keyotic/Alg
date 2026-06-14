@@ -10,34 +10,37 @@
   <body class="body">
     <header class="titleswipe">
       <h2>Algoracle</h2>
-      <button class="exit" onclick="goHome()"><img src="public/assets/img/ExitAlg.svg" alt="Exit"> </button>
+        <button class="exit" onclick="goHome()">
+          <img src="public/assets/img/ExitAlg.svg" alt="Exit">
+        </button>    
+      
     </header>
     <div id="root"></div>
     <script type="module" src="src/main.jsx"></script>
 
   </body>
 </html>
+
 <script>
-  async function goHome() {
-            if (isLeaving) return;
-            isLeaving = true;
+    const API =
+        window.location.hostname === "localhost"
+            ? "http://localhost:8000"
+            : "https://alg-backend.onrender.com";
 
-            stopSpeaking();
+    async function goHome() {
+        const userId = sessionStorage.getItem("user_id");
 
-            try {
-                await fetch(`${API}/reset`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ user_id: userId })
-                });
-            } catch (err) {
-                console.error("Reset failed:", err);
-            }
-
-            sessionStorage.removeItem("user_id");
-            window.location.href = "Home.html";
+        try {
+            await fetch(`${API}/reset`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: userId })
+            });
+        } catch (err) {
+            console.error("Reset failed:", err);
         }
 
+        sessionStorage.removeItem("user_id");
+        window.location.href = "Home.html";
+    }
 </script>

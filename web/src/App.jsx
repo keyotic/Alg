@@ -19,9 +19,19 @@ const reportAdvance = (itemId) => {
   axios.post(`${API}/advance`, { user_id: USER_ID, item_id: itemId }).catch(() => {});
 };
 
-function Card({ item, onSwipeLeft, onSwipeRight, isTop = true, onDragChange }) {
+function Card({
+  item,
+  onSwipeLeft,
+  onSwipeRight,
+  isTop = true,
+  onDragChange,
+  introNudge = false,
+  onIntroDone,
+}) {
   const [dragX, setDragX] = useState(0);
   const [exitDir, setExitDir] = useState(null);
+  const [introX, setIntroX] = useState(0);
+  const hasRunIntroRef = useRef(false);
 
   const handlers = useSwipeable({
     onSwiping: ({ deltaX }) => {
@@ -54,8 +64,28 @@ function Card({ item, onSwipeLeft, onSwipeRight, isTop = true, onDragChange }) {
   useEffect(() => {
     setDragX(0);
     setExitDir(null);
+    setIntroX(0);
+    hasRunIntroRef.current = false;
     onDragChange?.(0);
   }, [item?.item_id || item?.title || item]);
+
+  useEffect(() => {
+    if (!isTop || !introNudge || hasRunIntroRef.current) return;
+
+    hasRunIntroRef.current = true;
+
+    const start = setTimeout(() => setIntroX(16), 700);
+    const back = setTimeout(() => setIntroX(-6), 1050);
+    const settle = setTimeout(() => setIntroX(0), 1400);
+    const done = setTimeout(() => onIntroDone?.(), 1700);
+
+    return () => {
+      clearTimeout(start);
+      clearTimeout(back);
+      clearTimeout(settle);
+      clearTimeout(done);
+    };
+  }, [isTop, introNudge, onIntroDone]);
 
   return (
     <div style={{ width: 1034, overflow: "hidden", marginLeft: "-61em" }}>
@@ -68,9 +98,13 @@ function Card({ item, onSwipeLeft, onSwipeRight, isTop = true, onDragChange }) {
               : exitDir === "right"
               ? "translateX(160%) rotate(10deg)"
               : isTop
-              ? `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`
+              ? `translateX(${dragX + introX}px) rotate(${(dragX + introX) * 0.05}deg)`
               : "none",
-          transition: exitDir ? "transform 220ms ease-out" : "none",
+          transition: exitDir
+            ? "transform 220ms ease-out"
+            : introX !== 0
+            ? "transform 450ms ease-in-out"
+            : "none",
           willChange: "transform",
           touchAction: "pan-y",
         }}
@@ -111,6 +145,8 @@ function ActionButtons({ onSkip, onLike, dragX = 0, disabled = false }) {
         width: 1034,
         marginLeft: "-61em",
         marginTop: -200,
+        paddingTop: 45,
+        overflow: "hidden",
       }}
     >
       <button
@@ -185,6 +221,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dragX, setDragX] = useState(0);
+  const [introNudge, setIntroNudge] = useState(true);
   const hasFinishedRef = useRef(false);
   const isInternalNavigationRef = useRef(false);
 
@@ -235,6 +272,8 @@ export default function App() {
   };
 
   const handleInteraction = (item, action) => {
+    setIntroNudge(false);
+
     setQueue((q) => {
       const next = q.slice(1);
       if (next.length > 0) {
@@ -322,6 +361,8 @@ export default function App() {
                     onSwipeRight={onLike}
                     isTop={isTop}
                     onDragChange={setDragX}
+                    introNudge={isTop && introNudge}
+                    onIntroDone={() => setIntroNudge(false)}
                   />
                 </div>
               );
@@ -356,7 +397,7 @@ export default function App() {
                 height: 24,
                 backgroundColor: "#00000000",
                 overflow: "hidden",
-                border: "5px solid #ffffff",
+                borderTop: "5px solid #ffffff",
                 marginTop: -50,
               }}
             >
