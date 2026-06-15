@@ -291,3 +291,16 @@ button:focus-visible {
     
     
 }
+
+.yourFortune{
+  color: #FFF;
+  text-align: center;
+  font-family: fredoka-variable;
+  font-weight: 100;
+  font-size: 40pt;
+  font-style: normal;
+  line-height: normal;
+  margin-left: -850px;
+  margin-top: 460px;
+}
+

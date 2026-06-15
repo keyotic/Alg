@@ -74,16 +74,22 @@ function Card({
 
     hasRunIntroRef.current = true;
 
-    const start = setTimeout(() => setIntroX(16), 700);
-    const back = setTimeout(() => setIntroX(-6), 1050);
-    const settle = setTimeout(() => setIntroX(0), 1400);
-    const done = setTimeout(() => onIntroDone?.(), 1700);
+    // Peek right → left → right → left → settle center
+    const t1 = setTimeout(() => setIntroX(16), 600);    // right
+    const t2 = setTimeout(() => setIntroX(-16), 1200); // left
+    const t3 = setTimeout(() => setIntroX(16), 1800);  // right
+    const t4 = setTimeout(() => setIntroX(-10), 2400); // left (smaller)
+    const t5 = setTimeout(() => {
+      setIntroX(0);
+      onIntroDone?.();
+    }, 3200); // settle center
 
     return () => {
-      clearTimeout(start);
-      clearTimeout(back);
-      clearTimeout(settle);
-      clearTimeout(done);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      clearTimeout(t5);
     };
   }, [isTop, introNudge, onIntroDone]);
 
@@ -103,7 +109,7 @@ function Card({
           transition: exitDir
             ? "transform 220ms ease-out"
             : introX !== 0
-            ? "transform 450ms ease-in-out"
+            ? "transform 500ms cubic-bezier(0.4, 0.0, 0.2, 1)"
             : "none",
           willChange: "transform",
           touchAction: "pan-y",
@@ -405,8 +411,7 @@ export default function App() {
                 style={{
                   width: `${progressPercent}%`,
                   height: "100%",
-                  backgroundColor: "#C0FD02",
-                  borderRadius: 999,
+                  backgroundColor: "#ffffff",
                   transition: "width 180ms ease",
                 }}
               />
