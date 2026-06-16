@@ -120,7 +120,7 @@ function Card({
           alt={item.title || item.item_id}
           style={{
             width: "90%",
-            height: 1000,
+            height: 1100,
             objectFit: "cover",
             marginLeft: "3em",
             borderRadius: 20,
@@ -153,6 +153,8 @@ function ActionButtons({ onSkip, onLike, dragX = 0, disabled = false }) {
         marginTop: -200,
         paddingTop: 45,
         overflow: "hidden",
+        position: "relative",   // ← ADD THIS
+        zIndex: 200,            // ← ADD THIS (higher than cards' max z-index of 100)
       }}
     >
       <button
@@ -352,7 +354,7 @@ export default function App() {
                     top: isTop ? "auto" : 0,
                     left: isTop ? "auto" : 0,
                     zIndex: 100 - index,
-                    marginTop: "100px",
+                    marginTop: "50px",
                     transform: isTop
                       ? "none"
                       : `translateY(${index * 14}px) scale(${1 - index * 0.03})`,
@@ -404,7 +406,7 @@ export default function App() {
                 backgroundColor: "#00000000",
                 overflow: "hidden",
                 borderTop: "5px solid #ffffff",
-                marginTop: -50,
+                marginTop: 10,
               }}
             >
               <div
