@@ -12,34 +12,32 @@
     <div>
         <h1>Algoracle</h1>
     </div>
-    <div >
+    <div>
         <button onclick="window.location.href='Intro.html'" class="enter">ENTER</button>
     </div>
-</body>
-</div>
-<script>
-    const API =
-        window.location.hostname === "localhost"
-            ? "http://localhost:8000"
-            : "https://alg-backend.onrender.com";
 
-    window.addEventListener("load", async () => {
-        const userId = sessionStorage.getItem("user_id");
-        if (!userId) return;
+    <script>
+        const API =
+            window.location.hostname === "localhost"
+                ? "http://localhost:8000"
+                : "https://alg-backend.onrender.com";
 
-        try {
-            await fetch(`${API}/reset`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: userId })
-            });
-        } catch (err) {
-            console.error("Reset failed:", err);
-        }
+        window.addEventListener("load", async () => {
+            const userId = sessionStorage.getItem("user_id");
+            if (!userId) return;
 
-        sessionStorage.removeItem("user_id");
-    });
-</script>
+            try {
+                await fetch(`${API}/reset`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: userId })
+                });
+            } catch (err) {
+                console.error("Reset failed:", err);
+            }
 
+            sessionStorage.removeItem("user_id");
+        });
+    </script>
 </body>
 </html>
