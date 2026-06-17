@@ -239,14 +239,14 @@ def get_fortune_state(uid: str):
             "like_ratio": 0.0 if total == 0 else like_count / total,
             "skip_ratio": 0.0 if total == 0 else skip_count / total,
             "pool": [
-                "\"Your future is still unwritten, but possibility already surrounds you.\"",
-                "\"The path ahead is silent now… but something meaningful has begun.\"",
+                "\"The path ahead is unclear, but it is not empty.\"",
+                "\"Not knowing is the first step toward discovering.\"",
                 "\"A hidden opportunity waits for you to make the first move.\"",
-                "\"The first sign is subtle… yet it will lead you somewhere rare.\"",
-                "\"What feels distant now… will soon draw unexpectedly close.\"",
+                "\"The fog will lift when it is time to see farther.\"",
+                "\"A mystery in your life will reveal itself one piece at a time.\"",
                 "\"A quiet beginning is shaping a far greater destiny.\"",
                 "\"Something small is already shifting in your favor.\"",
-                "\"The answer has not appeared… but the pattern has begun.\"",
+                "\"Trust yourself when the map ends and the journey continues.\"",
                 "\"A new path opens the moment you decide to notice it.\""
             ]
         }
