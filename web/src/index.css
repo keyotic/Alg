@@ -200,8 +200,8 @@ button:focus-visible {
     justify-content: center;
     align-items: center;
     text-align: left;
-    width: 661px;
-    height: 90px;
+    width: 650px;
+    height: 80px;
     font-size: 30pt;
     font-weight: bold;
     font-family: mr-eaves-xl-modern, sans-serif;
@@ -223,7 +223,7 @@ button:focus-visible {
     text-align: center;
     background-color: #00000000;
     margin-left: 47px;
-    margin-top: -100px;
+    margin-top: -107px;
 }
 
 .titleswipe{
@@ -259,8 +259,8 @@ button:focus-visible {
 
 .predictiontext{
  margin-top: 800px;
- margin-left: -15em;
- width: 970px;
+ margin-left: -920px;
+ width: 950px;
  height: 210px;
  font-size : 46pt;
  font-weight: bold;
