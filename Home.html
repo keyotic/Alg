@@ -13,7 +13,7 @@
         <h1>Algoracle</h1>
     </div>
     <div>
-        <button onclick="window.location.href='Intro.html'" class="enter">ENTER</button>
+        <button onclick="handleEnter()" class="enter">ENTER</button>
     </div>
 
     <script>
@@ -22,22 +22,25 @@
                 ? "http://localhost:8000"
                 : "https://alg-backend.onrender.com";
 
-        window.addEventListener("load", async () => {
+        async function handleEnter() {
             const userId = sessionStorage.getItem("user_id");
-            if (!userId) return;
 
-            try {
-                await fetch(`${API}/reset`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ user_id: userId })
-                });
-            } catch (err) {
-                console.error("Reset failed:", err);
+            if (userId) {
+                try {
+                    await fetch(`${API}/reset`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ user_id: userId })
+                    });
+                } catch (err) {
+                    console.error("Reset failed:", err);
+                }
+
+                sessionStorage.removeItem("user_id");
             }
 
-            sessionStorage.removeItem("user_id");
-        });
+            window.location.href = "Intro.html";
+        }
     </script>
 </body>
 </html>
