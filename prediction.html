@@ -230,20 +230,6 @@
             stopSpeaking();
 
 
-            try {
-                await fetch(`${API}/reset`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ user_id: userId })
-                });
-            } catch (err) {
-                console.error("Reset failed:", err);
-            }
-
-
-            sessionStorage.removeItem("user_id");
             window.location.href = "Home.html";
         }
 
